@@ -17,7 +17,8 @@ try {
   git clone --depth 1 https://github.com/mattpocock/skills.git $Temp | Out-Host
   $wanted = @(
     'setup-matt-pocock-skills','grill-with-docs','grill-me','wayfinder','to-spec','to-tickets',
-    'tdd','codebase-design','domain-modeling','diagnosing-bugs','code-review','research','handoff'
+    'implement','tdd','codebase-design','domain-modeling','diagnosing-bugs','code-review',
+    'research','resolving-merge-conflicts','handoff'
   )
   foreach ($name in $wanted) {
     $match = Get-ChildItem -Path (Join-Path $Temp 'skills') -Directory -Recurse | Where-Object { $_.Name -eq $name -and (Test-Path (Join-Path $_.FullName 'SKILL.md')) } | Select-Object -First 1
@@ -31,7 +32,7 @@ try {
   if (Test-Path $Temp) { Remove-Item $Temp -Recurse -Force }
 }
 
-Write-Host '[2/4] Installing/updating gstack for OpenCode with gstack- prefix...'
+Write-Host '[2/6] Installing/updating gstack for OpenCode...'
 $GstackHome = Join-Path $env:USERPROFILE '.local\share\gstack'
 if (Test-Path (Join-Path $GstackHome '.git')) {
   git -C $GstackHome pull --ff-only | Out-Host
@@ -39,14 +40,19 @@ if (Test-Path (Join-Path $GstackHome '.git')) {
   New-Item -ItemType Directory -Force -Path (Split-Path -Parent $GstackHome) | Out-Null
   git clone https://github.com/garrytan/gstack.git $GstackHome | Out-Host
 }
+# NOTE: gstack installs skills flat (no namespace). The selected toolbox used by
+# STABLE/TEAM modes is qa, qa-only, review, ship, cso, investigate,
+# plan-ceo-review, design-review, benchmark. Namespaced entry points
+# (/gstack-qa etc.) are deployed from this repo's commands/ in step [5/6].
+# `retro` is intentionally excluded: Matt and gstack both define it.
 $bash = Get-Command bash -ErrorAction SilentlyContinue
 if ($bash) {
-  & $bash.Source (Join-Path $GstackHome 'setup') --host opencode --prefix
+  & $bash.Source (Join-Path $GstackHome 'setup') --host opencode
 } else {
-  Write-Warning 'bash not found. gstack clone is ready, but setup was skipped. Install Git Bash/WSL and run: bash ~/.local/share/gstack/setup --host opencode --prefix'
+  Write-Warning 'bash not found. gstack clone is ready, but setup was skipped. Install Git Bash/WSL and run: bash ~/.local/share/gstack/setup --host opencode'
 }
 
-Write-Host '[3/4] Checking local model file...'
+Write-Host '[3/6] Checking local model file...'
 $LocalDir = Join-Path $RepoRoot '.local'
 New-Item -ItemType Directory -Force -Path $LocalDir | Out-Null
 $Models = Join-Path $LocalDir 'models.ps1'
@@ -58,7 +64,7 @@ if (-not (Test-Path $Models)) {
 }
 if ($CreatedModels) { throw "Edit $Models with actual OpenCode model IDs, then run setup again." }
 
-Write-Host '[4/5] Installing TEAM Ensemble configuration...'
+Write-Host '[4/6] Installing TEAM Ensemble configuration...'
 $EnsembleTemplate = Join-Path $RepoRoot 'profiles\team\ensemble.json.template'
 $EnsembleDir = Join-Path $env:USERPROFILE '.config\opencode'
 $EnsembleConfig = Join-Path $EnsembleDir 'ensemble.json'
@@ -66,7 +72,18 @@ New-Item -ItemType Directory -Force -Path $EnsembleDir | Out-Null
 (Get-Content -Raw $EnsembleTemplate).Replace('__OPENCODE_WORKER_MODEL__', $env:OPENCODE_WORKER_MODEL) | Set-Content -Path $EnsembleConfig -Encoding UTF8
 Write-Host "  installed $EnsembleConfig for $($env:OPENCODE_WORKER_MODEL)"
 
-Write-Host '[5/5] Launchers...'
+Write-Host '[5/6] Deploying shared agents and commands...'
+$OcConfig = Join-Path $env:USERPROFILE '.config\opencode'
+$AgentsDir = Join-Path $OcConfig 'agents'
+$CommandsDir = Join-Path $OcConfig 'commands'
+New-Item -ItemType Directory -Force -Path $AgentsDir | Out-Null
+New-Item -ItemType Directory -Force -Path $CommandsDir | Out-Null
+Copy-Item (Join-Path $RepoRoot 'agents\*.md') $AgentsDir -Force
+Copy-Item (Join-Path $RepoRoot 'commands\*.md') $CommandsDir -Force
+Write-Host '  deployed stable-lead, team-lead, DeepSeek workers, /stable, /team, /gstack-* commands.'
+Write-Host '  NOTE: repo reviewer.md (DeepSeek) deploys to global agents/; the TEAM profile keeps its own GPT reviewer.'
+
+Write-Host '[6/6] Launchers...'
 if ($InstallLaunchers) {
   $Bin = Join-Path $env:USERPROFILE 'bin'
   New-Item -ItemType Directory -Force -Path $Bin | Out-Null

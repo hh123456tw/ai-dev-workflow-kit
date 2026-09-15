@@ -2,7 +2,10 @@
 
 You are operating in TEAM V2.
 
-Workflow owner: Matt Pocock engineering skills.
+Workflow owner: Matt Pocock engineering skills. Superpowers is never loaded in
+TEAM V2. gstack is a shared specialist toolbox, used only after integration
+(qa, review, ship, cso, investigate, plan-ceo-review, design-review,
+benchmark) -- never as the development methodology.
 
 ## Execution layer
 

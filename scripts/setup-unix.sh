@@ -12,7 +12,7 @@ mkdir -p "$TEAM"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 git clone --depth 1 https://github.com/mattpocock/skills.git "$TMP/matt"
-wanted=(setup-matt-pocock-skills grill-with-docs grill-me wayfinder to-spec to-tickets tdd codebase-design domain-modeling diagnosing-bugs code-review research handoff)
+wanted=(setup-matt-pocock-skills grill-with-docs grill-me wayfinder to-spec to-tickets implement tdd codebase-design domain-modeling diagnosing-bugs code-review research resolving-merge-conflicts handoff)
 for name in "${wanted[@]}"; do
   src="$(find "$TMP/matt/skills" -type f -name SKILL.md -path "*/$name/SKILL.md" -print -quit | xargs -r dirname)"
   if [[ -z "$src" ]]; then echo "warning: Matt skill not found upstream: $name" >&2; continue; fi
@@ -21,13 +21,18 @@ for name in "${wanted[@]}"; do
   echo "  installed Matt skill: $name"
 done
 
-printf '[2/4] Installing/updating gstack with gstack- prefix...\n'
+printf '[2/6] Installing/updating gstack...\n'
 GSTACK="$HOME/.local/share/gstack"
 mkdir -p "$(dirname "$GSTACK")"
 if [[ -d "$GSTACK/.git" ]]; then git -C "$GSTACK" pull --ff-only; else git clone https://github.com/garrytan/gstack.git "$GSTACK"; fi
-bash "$GSTACK/setup" --host opencode --prefix
+# NOTE: gstack installs skills flat (no namespace). The selected toolbox used by
+# STABLE/TEAM modes is qa, qa-only, review, ship, cso, investigate,
+# plan-ceo-review, design-review, benchmark. Namespaced entry points
+# (/gstack-qa etc.) are deployed from this repo's commands/ in step [5/6].
+# `retro` is intentionally excluded: Matt and gstack both define it.
+bash "$GSTACK/setup" --host opencode
 
-printf '[3/4] Checking local model file...\n'
+printf '[3/6] Checking local model file...\n'
 mkdir -p "$ROOT/.local"
 CREATED_MODELS=0
 if [[ ! -f "$ROOT/.local/models.sh" ]]; then
@@ -40,11 +45,18 @@ if [[ $CREATED_MODELS -eq 1 ]]; then
   exit 1
 fi
 
-printf '[4/5] Installing TEAM Ensemble configuration...\n'
+printf '[4/6] Installing TEAM Ensemble configuration...\n'
 mkdir -p "$HOME/.config/opencode"
 sed "s|__OPENCODE_WORKER_MODEL__|${OPENCODE_WORKER_MODEL}|g" "$ROOT/profiles/team/ensemble.json.template" > "$HOME/.config/opencode/ensemble.json"
 
-printf '[5/5] Launchers...\n'
+printf '[5/6] Deploying shared agents and commands...\n'
+mkdir -p "$HOME/.config/opencode/agents" "$HOME/.config/opencode/commands"
+cp "$ROOT"/agents/*.md "$HOME/.config/opencode/agents/"
+cp "$ROOT"/commands/*.md "$HOME/.config/opencode/commands/"
+echo '  deployed stable-lead, team-lead, DeepSeek workers, /stable, /team, /gstack-* commands.'
+echo '  NOTE: repo reviewer.md (DeepSeek) deploys to global agents/; the TEAM profile keeps its own GPT reviewer.'
+
+printf '[6/6] Launchers...\n'
 if [[ $INSTALL_LAUNCHERS -eq 1 ]]; then
   mkdir -p "$HOME/.local/bin"
   ln -sf "$ROOT/scripts/oc-product.sh" "$HOME/.local/bin/oc-product"

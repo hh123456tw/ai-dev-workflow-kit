@@ -80,3 +80,7 @@ PASS / CHANGES REQUIRED
 8. Reviewer is fresh-context and read-only by default.
 9. Parallel tickets require no dependencies, file overlap, or shared mutable state.
 10. Parallel write workers use separate branch + worktree.
+11. gstack is a shared specialist toolbox, used only after integration (qa,
+    review, ship, cso, investigate, plan-ceo-review, design-review,
+    benchmark) -- never as the development methodology. Superpowers is never
+    loaded in TEAM MODE.

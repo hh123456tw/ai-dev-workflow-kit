@@ -58,6 +58,53 @@ class PortableProfileBundleTest(unittest.TestCase):
         self.assertIn("model: openai/gpt-5.6-sol", reviewer)
         self.assertRegex(reviewer, re.compile(r"edit:\s*deny", re.S))
 
+        skill = team["permission"]["skill"]
+        for name in (
+            "qa", "qa-only", "review", "ship", "cso", "investigate",
+            "plan-ceo-review", "design-review", "benchmark",
+        ):
+            self.assertEqual(skill.get(name), "allow", name)
+        self.assertEqual(skill.get("superpowers-*"), "deny")
+        self.assertIn("specialist toolbox", orchestrator)
+
+    def test_shared_agents_commands_and_skill_isolation(self) -> None:
+        for relative in (
+            "agents/stable-lead.md",
+            "agents/team-lead.md",
+            "agents/explorer.md",
+            "agents/test-writer.md",
+            "agents/implementer.md",
+            "agents/reviewer.md",
+            "commands/stable.md",
+            "commands/team.md",
+            "commands/gstack-qa.md",
+            "commands/gstack-review.md",
+            "commands/gstack-ship.md",
+            "commands/gstack-cso.md",
+            "commands/gstack-investigate.md",
+            "commands/gstack-plan-ceo-review.md",
+            "commands/gstack-design-review.md",
+            "commands/gstack-benchmark.md",
+            "AGENTS.md",
+        ):
+            self.assertTrue((ROOT / relative).is_file(), relative)
+
+        stable = (ROOT / "agents/stable-lead.md").read_text(encoding="utf-8")
+        team_lead = (ROOT / "agents/team-lead.md").read_text(encoding="utf-8")
+        self.assertIn("model: openai/gpt-5.6-sol", stable)
+        self.assertIn("model: openai/gpt-5.6-sol", team_lead)
+        for denied in ("to-spec", "to-tickets", "implement", "grill-me", "tdd"):
+            self.assertIn(f"{denied}: deny", stable)
+        self.assertIn("superpowers-*: deny", team_lead)
+        for name in ("explorer", "test-writer", "implementer", "reviewer"):
+            content = (ROOT / f"agents/{name}.md").read_text(encoding="utf-8")
+            self.assertIn("model: deepseek/deepseek-v4-flash", content)
+
+        stable_cmd = (ROOT / "commands/stable.md").read_text(encoding="utf-8")
+        team_cmd = (ROOT / "commands/team.md").read_text(encoding="utf-8")
+        self.assertIn("agent: stable-lead", stable_cmd)
+        self.assertIn("agent: team-lead", team_cmd)
+
     def test_readme_explains_the_isolated_workflows_and_team_architecture(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("## 工作流差異", readme)
@@ -72,6 +119,18 @@ class PortableProfileBundleTest(unittest.TestCase):
         setup = (ROOT / "scripts/setup-windows.ps1").read_text(encoding="utf-8")
         self.assertIn("ensemble.json.template", setup)
         self.assertIn("OPENCODE_WORKER_MODEL", setup)
+        self.assertIn("'implement'", setup)
+        self.assertIn("'resolving-merge-conflicts'", setup)
+        self.assertIn("agents\\*.md", setup)
+        self.assertIn("commands\\*.md", setup)
+
+    def test_unix_setup_matches_windows_setup(self) -> None:
+        setup = (ROOT / "scripts/setup-unix.sh").read_text(encoding="utf-8")
+        self.assertIn("ensemble.json.template", setup)
+        self.assertIn("OPENCODE_WORKER_MODEL", setup)
+        self.assertIn("resolving-merge-conflicts", setup)
+        self.assertIn("agents/*.md", setup)
+        self.assertIn("commands/*.md", setup)
 
 
 if __name__ == "__main__":
