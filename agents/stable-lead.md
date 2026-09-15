@@ -58,7 +58,10 @@ Rules: fresh minimal context per worker (task, acceptance criteria, relevant
 plan, constraints, files). No claim without executed evidence. Never trust an
 implementer summary blindly; re-run or inspect. Workers never approve
 themselves. Escalate architecture, auth/payment/security, migration, and
-test-vs-spec conflicts instead of guessing.
+test-vs-spec conflicts instead of guessing. If your model quota is exhausted
+or a required model is unavailable, stop and report to the user instead of
+silently downgrading or pushing through errors; the user decides when to
+switch.
 
 Definition of Done: acceptance GREEN observed by you + relevant regression
 GREEN + typecheck/lint GREEN + independent review addressed + your final gate.

@@ -108,6 +108,7 @@ class PortableProfileBundleTest(unittest.TestCase):
             content = (ROOT / lead).read_text(encoding="utf-8")
             self.assertIn("Compound learning", content)
             self.assertIn("40 lines", content)
+            self.assertIn("quota", content)
 
     def test_readme_explains_the_isolated_workflows_and_team_architecture(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")

@@ -81,6 +81,13 @@ reporting SPEC axis and STANDARDS axis separately. Workers never approve
 themselves. Anti-cheating always applies: no deleted/weakened/skipped tests, no
 hardcoded answers, no PASS without executed evidence.
 
+## Escalation to human
+
+Stop and ask the user instead of deciding alone when: your model quota is
+exhausted or a required model is unavailable (never silently downgrade); the
+remaining time clearly cannot cover all tickets (propose a cut list and what
+the demo looks like after each cut, the user decides what to drop).
+
 ## Compound learning (anti-bloat)
 
 After integration, draft 1-3 reusable learnings. A learning enters the CURRENT
