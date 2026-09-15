@@ -9,7 +9,7 @@ function Require-Command($name) {
 Require-Command git
 Require-Command opencode
 
-Write-Host '[1/4] Preparing TEAM Matt skills...'
+Write-Host '[1/7] Preparing TEAM Matt skills...'
 $TeamSkills = Join-Path $RepoRoot 'profiles\team\skills'
 New-Item -ItemType Directory -Force -Path $TeamSkills | Out-Null
 $Temp = Join-Path $env:TEMP ("mattpocock-skills-" + [guid]::NewGuid().ToString('N'))
@@ -32,7 +32,7 @@ try {
   if (Test-Path $Temp) { Remove-Item $Temp -Recurse -Force }
 }
 
-Write-Host '[2/6] Installing/updating gstack for OpenCode...'
+Write-Host '[2/7] Installing/updating gstack for OpenCode...'
 $GstackHome = Join-Path $env:USERPROFILE '.local\share\gstack'
 if (Test-Path (Join-Path $GstackHome '.git')) {
   git -C $GstackHome pull --ff-only | Out-Host
@@ -52,7 +52,7 @@ if ($bash) {
   Write-Warning 'bash not found. gstack clone is ready, but setup was skipped. Install Git Bash/WSL and run: bash ~/.local/share/gstack/setup --host opencode'
 }
 
-Write-Host '[3/6] Checking local model file...'
+Write-Host '[3/7] Checking local model file...'
 $LocalDir = Join-Path $RepoRoot '.local'
 New-Item -ItemType Directory -Force -Path $LocalDir | Out-Null
 $Models = Join-Path $LocalDir 'models.ps1'
@@ -64,7 +64,7 @@ if (-not (Test-Path $Models)) {
 }
 if ($CreatedModels) { throw "Edit $Models with actual OpenCode model IDs, then run setup again." }
 
-Write-Host '[4/6] Installing TEAM Ensemble configuration...'
+Write-Host '[4/7] Installing TEAM Ensemble configuration...'
 $EnsembleTemplate = Join-Path $RepoRoot 'profiles\team\ensemble.json.template'
 $EnsembleDir = Join-Path $env:USERPROFILE '.config\opencode'
 $EnsembleConfig = Join-Path $EnsembleDir 'ensemble.json'
@@ -72,7 +72,7 @@ New-Item -ItemType Directory -Force -Path $EnsembleDir | Out-Null
 (Get-Content -Raw $EnsembleTemplate).Replace('__OPENCODE_WORKER_MODEL__', $env:OPENCODE_WORKER_MODEL) | Set-Content -Path $EnsembleConfig -Encoding UTF8
 Write-Host "  installed $EnsembleConfig for $($env:OPENCODE_WORKER_MODEL)"
 
-Write-Host '[5/6] Deploying shared agents and commands...'
+Write-Host '[5/7] Deploying shared agents and commands...'
 $OcConfig = Join-Path $env:USERPROFILE '.config\opencode'
 $AgentsDir = Join-Path $OcConfig 'agents'
 $CommandsDir = Join-Path $OcConfig 'commands'
@@ -83,7 +83,24 @@ Copy-Item (Join-Path $RepoRoot 'commands\*.md') $CommandsDir -Force
 Write-Host '  deployed stable-lead, team-lead, DeepSeek workers, /stable, /team, /gstack-* commands.'
 Write-Host '  NOTE: repo reviewer.md (DeepSeek) deploys to global agents/; the TEAM profile keeps its own GPT reviewer.'
 
-Write-Host '[6/6] Launchers...'
+Write-Host '[6/7] Deploying portable global config and gstack routing...'
+$OcConfigRoot = Join-Path $env:USERPROFILE '.config\opencode'
+$GlobalConfig = Join-Path $OcConfigRoot 'opencode.jsonc'
+if (-not (Test-Path $GlobalConfig)) {
+  Copy-Item (Join-Path $RepoRoot 'global\opencode.jsonc') $GlobalConfig
+  Write-Host '  installed global opencode.jsonc (was missing).'
+} else {
+  Write-Host '  global opencode.jsonc exists; left untouched (diff against repo global/ if drifted).'
+}
+$GstackConfig = Join-Path $OcConfigRoot 'gstack.jsonc'
+if (-not (Test-Path $GstackConfig)) {
+  Copy-Item (Join-Path $RepoRoot 'gstack\gstack.jsonc') $GstackConfig
+  Write-Host '  installed gstack.jsonc (was missing).'
+} else {
+  Write-Host '  gstack.jsonc exists; left untouched (diff against repo gstack/ if drifted).'
+}
+
+Write-Host '[7/7] Launchers...'
 if ($InstallLaunchers) {
   $Bin = Join-Path $env:USERPROFILE 'bin'
   New-Item -ItemType Directory -Force -Path $Bin | Out-Null

@@ -6,7 +6,7 @@ INSTALL_LAUNCHERS=0
 command -v git >/dev/null || { echo 'git required' >&2; exit 1; }
 command -v opencode >/dev/null || { echo 'opencode required' >&2; exit 1; }
 
-printf '[1/4] Preparing TEAM Matt skills...\n'
+printf '[1/7] Preparing TEAM Matt skills...\n'
 TEAM="$ROOT/profiles/team/skills"
 mkdir -p "$TEAM"
 TMP="$(mktemp -d)"
@@ -21,7 +21,7 @@ for name in "${wanted[@]}"; do
   echo "  installed Matt skill: $name"
 done
 
-printf '[2/6] Installing/updating gstack...\n'
+printf '[2/7] Installing/updating gstack...\n'
 GSTACK="$HOME/.local/share/gstack"
 mkdir -p "$(dirname "$GSTACK")"
 if [[ -d "$GSTACK/.git" ]]; then git -C "$GSTACK" pull --ff-only; else git clone https://github.com/garrytan/gstack.git "$GSTACK"; fi
@@ -32,7 +32,7 @@ if [[ -d "$GSTACK/.git" ]]; then git -C "$GSTACK" pull --ff-only; else git clone
 # `retro` is intentionally excluded: Matt and gstack both define it.
 bash "$GSTACK/setup" --host opencode
 
-printf '[3/6] Checking local model file...\n'
+printf '[3/7] Checking local model file...\n'
 mkdir -p "$ROOT/.local"
 CREATED_MODELS=0
 if [[ ! -f "$ROOT/.local/models.sh" ]]; then
@@ -45,18 +45,32 @@ if [[ $CREATED_MODELS -eq 1 ]]; then
   exit 1
 fi
 
-printf '[4/6] Installing TEAM Ensemble configuration...\n'
+printf '[4/7] Installing TEAM Ensemble configuration...\n'
 mkdir -p "$HOME/.config/opencode"
 sed "s|__OPENCODE_WORKER_MODEL__|${OPENCODE_WORKER_MODEL}|g" "$ROOT/profiles/team/ensemble.json.template" > "$HOME/.config/opencode/ensemble.json"
 
-printf '[5/6] Deploying shared agents and commands...\n'
+printf '[5/7] Deploying shared agents and commands...\n'
 mkdir -p "$HOME/.config/opencode/agents" "$HOME/.config/opencode/commands"
 cp "$ROOT"/agents/*.md "$HOME/.config/opencode/agents/"
 cp "$ROOT"/commands/*.md "$HOME/.config/opencode/commands/"
 echo '  deployed stable-lead, team-lead, DeepSeek workers, /stable, /team, /gstack-* commands.'
 echo '  NOTE: repo reviewer.md (DeepSeek) deploys to global agents/; the TEAM profile keeps its own GPT reviewer.'
 
-printf '[6/6] Launchers...\n'
+printf '[6/7] Deploying portable global config and gstack routing...\n'
+if [[ ! -f "$HOME/.config/opencode/opencode.jsonc" ]]; then
+  cp "$ROOT/global/opencode.jsonc" "$HOME/.config/opencode/opencode.jsonc"
+  echo '  installed global opencode.jsonc (was missing).'
+else
+  echo '  global opencode.jsonc exists; left untouched (diff against repo global/ if drifted).'
+fi
+if [[ ! -f "$HOME/.config/opencode/gstack.jsonc" ]]; then
+  cp "$ROOT/gstack/gstack.jsonc" "$HOME/.config/opencode/gstack.jsonc"
+  echo '  installed gstack.jsonc (was missing).'
+else
+  echo '  gstack.jsonc exists; left untouched (diff against repo gstack/ if drifted).'
+fi
+
+printf '[7/7] Launchers...\n'
 if [[ $INSTALL_LAUNCHERS -eq 1 ]]; then
   mkdir -p "$HOME/.local/bin"
   ln -sf "$ROOT/scripts/oc-product.sh" "$HOME/.local/bin/oc-product"
