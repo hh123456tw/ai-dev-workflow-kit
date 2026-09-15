@@ -9,6 +9,14 @@ function Require-Command($name) {
 Require-Command git
 Require-Command opencode
 
+Write-Host '[0/7] Pruning old backups (keep newest 3)...'
+$BackupRoot = Join-Path $env:USERPROFILE '.config\opencode'
+$OldBackups = Get-ChildItem -Path $BackupRoot -Directory -Filter 'backup_*' -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -Skip 3
+foreach ($old in $OldBackups) {
+  Remove-Item -LiteralPath $old.FullName -Recurse -Force
+  Write-Host "  pruned old backup: $($old.Name)"
+}
+
 Write-Host '[1/7] Preparing TEAM Matt skills...'
 $TeamSkills = Join-Path $RepoRoot 'profiles\team\skills'
 New-Item -ItemType Directory -Force -Path $TeamSkills | Out-Null

@@ -6,6 +6,16 @@ INSTALL_LAUNCHERS=0
 command -v git >/dev/null || { echo 'git required' >&2; exit 1; }
 command -v opencode >/dev/null || { echo 'opencode required' >&2; exit 1; }
 
+printf '[0/7] Pruning old backups (keep newest 3)...\n'
+BACKUP_ROOT="$HOME/.config/opencode"
+if [[ -d "$BACKUP_ROOT" ]]; then
+  i=0
+  for d in $(ls -d "$BACKUP_ROOT"/backup_* 2>/dev/null | sort -r); do
+    i=$((i + 1))
+    if [[ $i -gt 3 ]]; then rm -rf "$d"; echo "  pruned old backup: $d"; fi
+  done
+fi
+
 printf '[1/7] Preparing TEAM Matt skills...\n'
 TEAM="$ROOT/profiles/team/skills"
 mkdir -p "$TEAM"

@@ -123,6 +123,14 @@ class PortableProfileBundleTest(unittest.TestCase):
         self.assertIn("'resolving-merge-conflicts'", setup)
         self.assertIn("agents\\*.md", setup)
         self.assertIn("commands\\*.md", setup)
+        self.assertIn("backup_*", setup)
+
+    def test_design_brief_is_archived(self) -> None:
+        brief = ROOT / "prompts/original-dual-workflow-brief.md"
+        self.assertTrue(brief.is_file())
+        content = brief.read_text(encoding="utf-8")
+        self.assertIn("STABLE MODE", content)
+        self.assertIn("TEAM MODE", content)
 
     def test_unix_setup_matches_windows_setup(self) -> None:
         setup = (ROOT / "scripts/setup-unix.sh").read_text(encoding="utf-8")
