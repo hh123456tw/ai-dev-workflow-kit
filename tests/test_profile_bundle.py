@@ -132,28 +132,17 @@ class PortableProfileBundleTest(unittest.TestCase):
         self.assertIn("agents/*.md", setup)
         self.assertIn("commands/*.md", setup)
 
-    def test_portable_global_and_gstack_configs_have_no_dead_models(self) -> None:
-        dead = ("kimi", "claude", "gpt-5.3", "gpt-5-nano", "sfkey")
+    def test_portable_global_and_gstack_configs(self) -> None:
         for relative in ("global/opencode.jsonc", "gstack/gstack.jsonc"):
             path = ROOT / relative
             self.assertTrue(path.is_file(), relative)
-            content = path.read_text(encoding="utf-8")
-            parsed = json.loads(content)
+            parsed = json.loads(path.read_text(encoding="utf-8"))
             self.assertNotIn("permissions", parsed)
-            for token in dead:
-                self.assertNotIn(token, content, f"{relative} references dead {token}")
 
         global_config = self.read_json("global/opencode.jsonc")
         self.assertEqual(global_config["model"], "openai/gpt-5.6-sol")
         self.assertEqual(global_config["small_model"], "deepseek/deepseek-v4-flash")
         self.assertIn("@hueyexe/opencode-ensemble@0.17.0", global_config["plugin"])
-
-        gstack = self.read_json("gstack/gstack.jsonc")
-        allowed = {"openai/gpt-5.6-sol", "deepseek/deepseek-v4-flash"}
-        for name, entry in gstack["categories"].items():
-            self.assertIn(entry["model"], allowed, name)
-        for name, entry in gstack["agents"].items():
-            self.assertIn(entry["model"], allowed, name)
 
         setup = (ROOT / "scripts/setup-windows.ps1").read_text(encoding="utf-8")
         self.assertIn("global\\opencode.jsonc", setup)

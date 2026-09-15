@@ -13,30 +13,7 @@
       "max_base64_bytes": 163840
     }
   },
-  "provider": {
-    "ollama": {
-      "npm": "@ai-sdk/openai-compatible",
-      "options": {
-        "baseURL": "http://localhost:11434/v1"
-      },
-      "models": {
-        "qwen2.5:0.5b": {
-          "name": "Qwen 2.5 0.5B",
-          "limit": {
-            "context": 32768,
-            "output": 4096
-          }
-        },
-        "gemma4:e2b": {
-          "name": "Gemma 4 E2B",
-          "limit": {
-            "context": 32768,
-            "output": 8192
-          }
-        }
-      }
-    }
-  },
+  "provider": {},
   "compaction": {
     "auto": false,
     "prune": true,
