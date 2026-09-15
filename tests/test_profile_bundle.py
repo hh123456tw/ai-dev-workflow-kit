@@ -60,10 +60,13 @@ class PortableProfileBundleTest(unittest.TestCase):
 
     def test_readme_explains_the_isolated_workflows_and_team_architecture(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("## Workflow differences", readme)
-        self.assertIn("## TEAM execution architecture", readme)
+        self.assertIn("## 工作流差異", readme)
+        self.assertIn("## TEAM 執行架構", readme)
         self.assertIn("OpenCode Ensemble", readme)
         self.assertIn("```mermaid", readme)
+        self.assertIn("## PRODUCT 執行架構", readme)
+        self.assertIn("PRODUCT：", readme)
+        self.assertIn("TEAM：", readme)
 
     def test_windows_setup_installs_the_portable_ensemble_configuration(self) -> None:
         setup = (ROOT / "scripts/setup-windows.ps1").read_text(encoding="utf-8")
