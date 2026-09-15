@@ -104,6 +104,10 @@ class PortableProfileBundleTest(unittest.TestCase):
         team_cmd = (ROOT / "commands/team.md").read_text(encoding="utf-8")
         self.assertIn("agent: stable-lead", stable_cmd)
         self.assertIn("agent: team-lead", team_cmd)
+        for lead in ("agents/stable-lead.md", "agents/team-lead.md"):
+            content = (ROOT / lead).read_text(encoding="utf-8")
+            self.assertIn("Compound learning", content)
+            self.assertIn("40 lines", content)
 
     def test_readme_explains_the_isolated_workflows_and_team_architecture(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")

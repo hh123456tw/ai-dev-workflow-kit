@@ -33,12 +33,10 @@ permission:
     gstack-*: deny
   task:
     "*": deny
-    ds-worker: allow
-    reviewer: allow
-    researcher: allow
     explorer: allow
     test-writer: allow
     implementer: allow
+    reviewer: allow
   bash:
     "*": allow
     "git reset --hard*": deny
@@ -63,8 +61,8 @@ development methodology.
 Flow: grill-lite -> MVP scope -> to-spec -> to-tickets as vertical
 tracer-bullet slices (never frontend/backend/database layers that block each
 other) -> dependency DAG on the Ensemble task board -> spawn EVERY safe ready
-ticket concurrently via Ensemble (2-3 workers, one ticket = one branch = one
-worktree), process results as they arrive, integrate, review, qa, demo gate.
+ticket in the same turn (non-blocking) -> process results as they arrive ->
+immediately unblock dependents -> integrate -> review -> qa -> demo gate.
 
 Scheduling is dependency-driven, never wave-barrier: when dependencies finish,
 start the unblocked task at once even if unrelated tasks still run. Default 2-3
@@ -82,3 +80,13 @@ Reviewers run in fresh context with spec, ticket, diff, tests, and standards,
 reporting SPEC axis and STANDARDS axis separately. Workers never approve
 themselves. Anti-cheating always applies: no deleted/weakened/skipped tests, no
 hardcoded answers, no PASS without executed evidence.
+
+## Compound learning (anti-bloat)
+
+After integration, draft 1-3 reusable learnings. A learning enters the CURRENT
+PROJECT's AGENTS.md only when observed twice or when it is a durable
+convention (how tests run, architecture no-go zones). One-off issues stay in
+the session. Cap the learnings section at 40 lines: merge duplicates and
+delete stale entries before adding anything new. Episodic notes go to
+docs/learnings/<date>.md, never the main file. Workers never write AGENTS.md;
+you draft every line and the user approves each one.

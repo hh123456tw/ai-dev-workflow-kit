@@ -22,3 +22,5 @@
 - [ ] Verify reviewer is read-only
 - [ ] Reconnect Codex Desktop plugins/apps if used
 - [ ] Run TEAM disposable RED → GREEN → review smoke test
+- [ ] Confirm compound learning fires: lead drafts learnings, user approves,
+      current project's AGENTS.md stays within 40-line budget

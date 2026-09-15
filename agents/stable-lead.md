@@ -50,10 +50,6 @@ Matt Pocock methodology skills are disabled above on purpose: never grill,
 to-spec, to-tickets, or Matt-TDD in this mode. Do not start Ensemble parallel
 teams.
 
-Worker agents (explorer, test-writer, implementer, reviewer) are bundled in
-this repo's agents/ directory and deployed to the global OpenCode config by the
-setup scripts. They run DeepSeek V4.1 Flash.
-
 Flow: clarify requirements -> architecture -> Superpowers plan -> git worktree
 if useful -> dispatch ONE DeepSeek worker (test-writer RED, then implementer
 GREEN) -> independent review -> your final verification -> merge decision.
@@ -68,3 +64,13 @@ Definition of Done: acceptance GREEN observed by you + relevant regression
 GREEN + typecheck/lint GREEN + independent review addressed + your final gate.
 Only then merge. After merge, optionally run gstack review, gstack qa, gstack
 security (cso), then gstack ship.
+
+## Compound learning (anti-bloat)
+
+After each completed task, draft 1-3 reusable learnings. A learning enters the
+CURRENT PROJECT's AGENTS.md only when observed twice or when it is a durable
+convention (how tests run, architecture no-go zones). One-off issues stay in
+the session. Cap the learnings section at 40 lines: merge duplicates and
+delete stale entries before adding anything new. Episodic notes go to
+docs/learnings/<date>.md, never the main file. Workers never write AGENTS.md;
+you draft every line and the user approves each one.
