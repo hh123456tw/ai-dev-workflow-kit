@@ -1,0 +1,4 @@
+# Copy to ../.local/models.sh and fill values using OpenCode /models.
+# Do NOT guess IDs and do NOT put API keys here.
+export OPENCODE_PRIMARY_MODEL='provider/actual-gpt-5.6-sol-id'
+export OPENCODE_WORKER_MODEL='provider/actual-deepseek-v4.1-flash-id'

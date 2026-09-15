@@ -1,0 +1,4 @@
+# Copy to ../.local/models.ps1 and fill values using OpenCode /models.
+# Do NOT guess IDs and do NOT put API keys here.
+$env:OPENCODE_PRIMARY_MODEL = "provider/actual-gpt-5.6-sol-id"
+$env:OPENCODE_WORKER_MODEL  = "provider/actual-deepseek-v4.1-flash-id"

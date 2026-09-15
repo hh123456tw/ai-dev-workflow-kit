@@ -1,0 +1,31 @@
+# Secrets / credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Local machine-only model/provider choices
+.local/*
+!.local/README.md
+
+# Runtime / caches
+node_modules/
+.cache/
+.opencode-cache/
+*.log
+__pycache__/
+*.py[cod]
+
+# Third-party skills are restored from upstream, not vendored
+profiles/team/skills/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+.idea/

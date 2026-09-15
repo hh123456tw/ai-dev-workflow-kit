@@ -1,0 +1,73 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "{env:OPENCODE_PRIMARY_MODEL}",
+  "default_agent": "orchestrator",
+  "subagent_depth": 1,
+  "instructions": ["./TEAM_V2.md"],
+
+  "plugin": [],
+
+  "permission": {
+    "read": {
+      "*": "allow",
+      "**/.env": "deny",
+      "**/.env.*": "deny",
+      "**/secrets/**": "deny",
+      "**/credentials/**": "deny",
+      "**/*credentials*": "deny",
+      "**/*secret*": "deny",
+      "**/*.pem": "deny",
+      "**/*.key": "deny",
+      "**/id_rsa": "deny",
+      "**/id_ed25519": "deny"
+    },
+    "edit": {
+      "*": "allow",
+      "**/.env": "deny",
+      "**/.env.*": "deny",
+      "**/secrets/**": "deny",
+      "**/credentials/**": "deny",
+      "**/*credentials*": "deny",
+      "**/*secret*": "deny",
+      "**/*.pem": "deny",
+      "**/*.key": "deny",
+      "**/id_rsa": "deny",
+      "**/id_ed25519": "deny"
+    },
+    "skill": {
+      "*": "deny",
+      "setup-matt-pocock-skills": "allow",
+      "grill-with-docs": "allow",
+      "grill-me": "allow",
+      "wayfinder": "allow",
+      "to-spec": "allow",
+      "to-tickets": "allow",
+      "implement": "allow",
+      "tdd": "allow",
+      "codebase-design": "allow",
+      "domain-modeling": "allow",
+      "diagnosing-bugs": "allow",
+      "code-review": "allow",
+      "research": "allow",
+      "handoff": "allow",
+      "gstack-*": "deny",
+      "superpowers-*": "deny"
+    },
+    "bash": {
+      "*": "allow",
+      "git reset --hard*": "deny",
+      "git clean*": "deny",
+      "git branch -D*": "deny",
+      "git push --force*": "deny",
+      "git push -f*": "deny",
+      "git rebase*": "ask",
+      "git push*": "ask"
+    },
+    "task": {
+      "*": "deny",
+      "ds-worker": "allow",
+      "reviewer": "allow",
+      "researcher": "allow"
+    }
+  }
+}
