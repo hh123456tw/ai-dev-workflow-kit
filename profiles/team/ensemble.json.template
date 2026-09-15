@@ -1,0 +1,14 @@
+{
+  "mergeOnCleanup": false,
+  "stallThresholdMs": 300000,
+  "timeoutMs": 1800000,
+  "rateLimitCapacity": 10,
+  "dashboardPort": 4747,
+  "defaultModel": "__OPENCODE_WORKER_MODEL__",
+  "modelsByAgent": {
+    "ds-worker": "__OPENCODE_WORKER_MODEL__",
+    "explore": "__OPENCODE_WORKER_MODEL__"
+  },
+  "modelAssignment": "default",
+  "promptForModels": false
+}

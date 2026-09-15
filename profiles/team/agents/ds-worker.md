@@ -1,7 +1,6 @@
 ---
 description: Scoped TEAM implementation worker using DeepSeek V4.1 Flash and Matt TDD; one ticket only.
 mode: subagent
-model: deepseek/deepseek-flash
 steps: 15
 hidden: true
 permission:
@@ -107,6 +106,13 @@ permission:
     "./gradlew test *": allow
     "git status*": allow
     "git diff*": allow
+    "git add *": allow
+    "git commit -m *": allow
+    "git push*": deny
+    "git merge*": deny
+    "git rebase*": deny
+    "git reset*": deny
+    "git clean*": deny
     "*--fix*": deny
     "*--write*": deny
     "*--updateSnapshot*": deny
@@ -139,8 +145,11 @@ Workflow:
 5. Re-run the targeted test until GREEN, without exceeding this attempt's step
    budget or broadening scope.
 6. Run only the requested targeted regression, typecheck, and lint commands.
-7. Return changed files, concise summary, exact commands/results, attempt number,
-   and remaining concerns.
+7. Inspect `git diff --name-only`, confirm every changed file is in Allowed
+   Production Files, stage only those exact files, then create one local
+   `git commit -m "team: <ticket summary>"` transport commit.
+8. Return changed files, commit hash, concise summary, exact commands/results,
+   attempt number, and remaining concerns.
 
 Acceptance tests and all test/spec/fixture/snapshot paths are read-only
 contracts. Never modify, add, delete, weaken, skip, xfail, re-expect, loosen
@@ -152,7 +161,9 @@ wrong, stop instead of fixing it.
 Never change API contracts, public interfaces, database schemas, migrations,
 libraries/dependencies, architecture/layers, broad module placement, or unrelated
 code. Never add speculative abstractions, access secrets, use the web, dispatch a
-subagent, commit/merge/push, use a stash, or run destructive git commands.
+subagent, merge/push, use a stash, or run destructive git commands. The only Git
+write allowed is one local transport commit in the worker's own Ensemble worktree
+after the required scope inspection; never amend or commit a forbidden file.
 
 On failure or required out-of-scope work, stop and return exactly one category:
 IMPLEMENTATION_FAILURE, CONTRACT_CONFLICT, ENVIRONMENT_FAILURE,

@@ -50,7 +50,7 @@ class PortableProfileBundleTest(unittest.TestCase):
         self.assertIn("Contract freeze gate", orchestrator)
         self.assertIn("at most two implementation", orchestrator)
         self.assertIn("GPT-5.6 takeover", orchestrator)
-        self.assertIn("model: {env:OPENCODE_WORKER_MODEL}", worker)
+        self.assertNotIn("\nmodel:", worker)
         self.assertIn("steps: 15", worker)
         self.assertRegex(worker, re.compile(r"task:\s*deny", re.S))
         self.assertRegex(worker, re.compile(r"webfetch:\s*deny", re.S))

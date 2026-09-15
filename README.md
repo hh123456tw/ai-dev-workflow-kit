@@ -1,157 +1,89 @@
-# OpenCode Dual Workflow Profiles
+# OpenCode Dual Workflow Kit
 
-Portable configuration for two isolated AI development workflows:
+Portable, isolated OpenCode profiles for two different kinds of development.
+This repository contains configuration and restore scripts only: credentials,
+OAuth state, model choices, caches, and third-party framework source stay local.
 
-## 1. PRODUCT mode
+## Workflow differences
 
-**GPT-5.6 Sol product lead + DeepSeek V4.1 Flash workers + gstack + Superpowers**
+| | PRODUCT | TEAM |
+|---|---|---|
+| Best for | Fast product delivery, QA, and shipping | High-confidence engineering changes |
+| Lead | GPT-5.6 Sol | GPT-5.6 Sol |
+| Method | gstack + Superpowers | Matt Pocock skills |
+| Worker | Product-selected worker flow | DeepSeek V4.1 Flash (`OPENCODE_WORKER_MODEL`) |
+| Tests | Fast verification | Frozen acceptance-test contracts |
+| Parallelism | Only when useful | Ensemble dependency DAG; default 3, max 4 writers |
+| Isolation | Product workflow only | Dedicated Git worktree per writable ticket |
 
-Use for:
+PRODUCT never routes into TEAM methodology. TEAM never loads gstack or
+Superpowers; Matt skills define its engineering method while OpenCode Ensemble
+does scheduling and worktree isolation.
 
-- side projects
-- hackathons
-- fast product iteration
-- product thinking / QA / shipping
+## TEAM execution architecture
 
-Launch:
-
-```powershell
-oc-product
+```mermaid
+flowchart TD
+  U[User] --> L[GPT-5.6 Tech Lead]
+  L --> M[Matt: grill → spec → tickets]
+  M --> D[Dependency DAG]
+  D --> E[OpenCode Ensemble]
+  E --> W1[DeepSeek worker / worktree A]
+  E --> W2[DeepSeek worker / worktree B]
+  E --> W3[DeepSeek worker / worktree C]
+  W1 --> V[GPT verification + review]
+  W2 --> V
+  W3 --> V
+  V --> I[GPT integration and merge]
 ```
 
-## 2. TEAM V2 mode
+Within a ticket, causality remains **RED → GREEN → review**. Across independent
+tickets, Ensemble starts every ready worker non-blockingly and starts dependent
+work immediately when its prerequisites finish. A worker makes one scoped local
+transport commit in its own worktree; only the GPT lead merges it.
 
-**GPT-5.6 Sol orchestrator/reviewer + Matt Pocock engineering skills + DeepSeek V4.1 Flash bounded workers**
+## Install on Windows
 
-Core rule:
-
-> GPT decides correctness. DeepSeek implements. Tests are contracts.
-
-Launch:
-
-```powershell
-oc-team
-```
-
-## Why the profiles are isolated
-
-Superpowers has a strong session bootstrap and gstack has its own product workflow. TEAM V2 intentionally keeps Matt Pocock as the workflow owner so routing does not become ambiguous.
-
-- PRODUCT sees gstack + Superpowers; GPT-5.6 leads and DeepSeek V4.1 Flash handles scoped implementation work.
-- TEAM sees Matt skills and hides gstack.
-- TEAM does **not** load the Superpowers plugin.
-
-## Repository layout
-
-```text
-profiles/
-  product/              PRODUCT OpenCode config
-  team/                 TEAM V2 OpenCode config + orchestration rules
-workflows/
-  product.md            Human-readable PRODUCT workflow
-  team-v2.md            Human-readable TEAM V2 workflow
-prompts/
-  team-v2-upgrade.md    Prompt for repairing/upgrading TEAM mode
-scripts/
-  setup-windows.ps1     Restore on Windows
-  setup-unix.sh         Restore on macOS/Linux
-  oc-product.ps1        PRODUCT launcher
-  oc-team.ps1           TEAM launcher
-  models.*.example      Local model-ID templates
-desktop/
-  codex/                Codex Desktop rebuild checklist
-  opencode/             OpenCode Desktop/TUI rebuild notes
-```
-
-## First install on a new Windows computer
-
-Prerequisites:
-
-- Git
-- Node.js / npm
-- OpenCode
-- PowerShell
-- Bash from Git for Windows or WSL if you want gstack installed automatically
-
-Clone this repo and run:
+Prerequisites: Git, Node.js/npm, OpenCode, PowerShell, and Git Bash or WSL for
 
 ```powershell
+git clone https://github.com/<you>/opencode-dual-workflow-kit.git
+Set-Location opencode-dual-workflow-kit
 Set-ExecutionPolicy -Scope Process Bypass
 ./scripts/setup-windows.ps1 -InstallLaunchers
 ```
 
-Then copy the model template:
-
-```powershell
-Copy-Item ./scripts/models.ps1.example ./.local/models.ps1
-```
-
-Use OpenCode `/models` to get the **actual IDs available on that computer**, then edit `.local/models.ps1`.
-
-Do not guess model IDs.
-
-After provider authentication is configured locally:
+The first setup run creates `.local/models.ps1` and stops. Use OpenCode
+`/models` on that computer, put its real model IDs in that file, then run setup
+once more. Authenticate providers locally, then run:
 
 ```powershell
 oc-product
 oc-team
 ```
 
-## First install on macOS/Linux
+## Install on macOS/Linux
 
 ```bash
-chmod +x scripts/setup-unix.sh scripts/oc-product.sh scripts/oc-team.sh
+git clone https://github.com/<you>/opencode-dual-workflow-kit.git
+cd opencode-dual-workflow-kit
+chmod +x scripts/*.sh
 ./scripts/setup-unix.sh --install-launchers
 cp scripts/models.sh.example .local/models.sh
 ```
 
-Fill the actual model IDs from `opencode /models`, then:
+Set actual local model IDs and provider authentication, then run `oc-product` or
+`oc-team`.
 
-```bash
-oc-product
-oc-team
-```
+## Security
 
-## Updating third-party frameworks
+Never commit `.local/`, provider credentials, OpenCode global config, OAuth
+state, worktrees, or runtime databases. See [SECURITY.md](SECURITY.md).
 
-This repo deliberately does not vendor gstack, Superpowers, or Matt Pocock's skills.
+## Upstream projects
 
-- Superpowers: PRODUCT profile uses OpenCode's git-backed plugin install.
-- gstack: setup scripts clone/update upstream and install with the `gstack-` prefix.
-- Matt skills: setup scripts clone upstream and copy only the selected skills into the TEAM profile's private skills directory.
-
-Run setup again to refresh them.
-
-## Desktop apps
-
-See:
-
-- `desktop/codex/README.md`
-- `desktop/opencode/README.md`
-
-Account-backed plugin connections and OAuth authorizations are intentionally **not** backed up to Git.
-
-## Sources / upstream projects
-
-- OpenCode: https://opencode.ai/
-- Superpowers: https://github.com/obra/superpowers
-- gstack: https://github.com/garrytan/gstack
-- Matt Pocock Skills: https://github.com/mattpocock/skills
-
-## Publish this backup repo to GitHub
-
-The recommended default is a **private** repository.
-
-Windows:
-
-```powershell
-./scripts/publish-github.ps1 -RepoName opencode-dev-profiles -Visibility private
-```
-
-macOS/Linux:
-
-```bash
-./scripts/publish-github.sh opencode-dev-profiles private
-```
-
-The publish helper requires GitHub CLI (`gh`) to already be authenticated on that computer.
+- [OpenCode](https://opencode.ai/)
+- [OpenCode Ensemble](https://github.com/hueyexe/opencode-ensemble)
+- [Superpowers](https://github.com/obra/superpowers)
+- [gstack](https://github.com/garrytan/gstack)
+- [Matt Pocock Skills](https://github.com/mattpocock/skills)

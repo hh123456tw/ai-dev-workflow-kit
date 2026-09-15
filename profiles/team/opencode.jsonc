@@ -1,11 +1,12 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "{env:OPENCODE_PRIMARY_MODEL}",
+  "small_model": "{env:OPENCODE_WORKER_MODEL}",
   "default_agent": "orchestrator",
   "subagent_depth": 1,
   "instructions": ["./TEAM_V2.md"],
 
-  "plugin": [],
+  "plugin": ["@hueyexe/opencode-ensemble@0.17.0"],
 
   "permission": {
     "read": {

@@ -17,6 +17,8 @@ credentials/
 node_modules/
 .cache/
 .opencode-cache/
+.opencode/
+.worktrees/
 *.log
 __pycache__/
 *.py[cod]

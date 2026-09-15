@@ -4,6 +4,15 @@ You are operating in TEAM V2.
 
 Workflow owner: Matt Pocock engineering skills.
 
+## Execution layer
+
+OpenCode Ensemble owns TEAM scheduling, dependency tracking, result collection,
+and isolated Git worktrees. The lead creates a task DAG, spawns every ready
+independent `ds-worker` non-blockingly (default width three, maximum four), and
+starts dependent work as soon as its real prerequisites complete. Never schedule
+by ticket order or wait for unrelated work. TEAM retains causal TDD within each
+ticket: GPT RED -> DeepSeek GREEN -> GPT verification/review.
+
 ## Role separation
 
 - GPT orchestrator defines correctness.

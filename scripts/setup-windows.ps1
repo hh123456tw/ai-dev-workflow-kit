@@ -50,12 +50,23 @@ Write-Host '[3/4] Checking local model file...'
 $LocalDir = Join-Path $RepoRoot '.local'
 New-Item -ItemType Directory -Force -Path $LocalDir | Out-Null
 $Models = Join-Path $LocalDir 'models.ps1'
+$CreatedModels = $false
 if (-not (Test-Path $Models)) {
   Copy-Item (Join-Path $RepoRoot 'scripts\models.ps1.example') $Models
+  $CreatedModels = $true
   Write-Warning "Created $Models. Fill actual model IDs from OpenCode /models before launching profiles."
 }
+if ($CreatedModels) { throw "Edit $Models with actual OpenCode model IDs, then run setup again." }
 
-Write-Host '[4/4] Launchers...'
+Write-Host '[4/5] Installing TEAM Ensemble configuration...'
+$EnsembleTemplate = Join-Path $RepoRoot 'profiles\team\ensemble.json.template'
+$EnsembleDir = Join-Path $env:USERPROFILE '.config\opencode'
+$EnsembleConfig = Join-Path $EnsembleDir 'ensemble.json'
+New-Item -ItemType Directory -Force -Path $EnsembleDir | Out-Null
+(Get-Content -Raw $EnsembleTemplate).Replace('__OPENCODE_WORKER_MODEL__', $env:OPENCODE_WORKER_MODEL) | Set-Content -Path $EnsembleConfig -Encoding UTF8
+Write-Host "  installed $EnsembleConfig for $($env:OPENCODE_WORKER_MODEL)"
+
+Write-Host '[5/5] Launchers...'
 if ($InstallLaunchers) {
   $Bin = Join-Path $env:USERPROFILE 'bin'
   New-Item -ItemType Directory -Force -Path $Bin | Out-Null

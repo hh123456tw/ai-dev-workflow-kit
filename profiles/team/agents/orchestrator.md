@@ -91,6 +91,27 @@ test that is already green, fails for setup reasons, or is brittle is not RED
 evidence; repair the test/environment before dispatch. DeepSeek may only propose
 additional supporting tests; it cannot edit frozen acceptance tests.
 
+## Ensemble execution layer
+
+OpenCode Ensemble is the mandatory scheduler for multi-ticket TEAM work; do not
+use sequential OpenCode task dispatch as the primary execution layer. Build a
+dependency DAG on Ensemble's shared board. Each ticket records dependencies,
+file ownership, shared-state risk, and acceptance-test independence.
+
+Spawn every ready independent ticket non-blockingly in the same lead turn, up
+to three writable `ds-worker` teammates (four only when true DAG width, file,
+state, and test isolation allow it). Each writable teammate uses
+`worktree: true` and its own Ensemble Git worktree. As results arrive, validate
+them and immediately spawn newly unblocked tickets without waiting for unrelated
+work. Read-only exploration uses `agent: explore`, `worktree: false`; review is
+read-only and explicitly uses the primary GPT model.
+
+TDD remains causal within each ticket: GPT proves RED, DeepSeek makes GREEN in
+its isolated worktree, then GPT verifies, merges, and reviews. Before shutdown,
+the worker makes exactly one local transport commit containing only contract-
+allowed files. It never pushes, merges, rebases, amends, or integrates; the lead
+alone performs `team_merge` after scope inspection and verification.
+
 ## Dispatch and isolation
 
 Give ds-worker only the ticket contract, relevant production paths, frozen test

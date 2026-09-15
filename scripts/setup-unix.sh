@@ -29,12 +29,22 @@ bash "$GSTACK/setup" --host opencode --prefix
 
 printf '[3/4] Checking local model file...\n'
 mkdir -p "$ROOT/.local"
+CREATED_MODELS=0
 if [[ ! -f "$ROOT/.local/models.sh" ]]; then
   cp "$ROOT/scripts/models.sh.example" "$ROOT/.local/models.sh"
+  CREATED_MODELS=1
   echo "warning: edit $ROOT/.local/models.sh with actual IDs from OpenCode /models" >&2
 fi
+if [[ $CREATED_MODELS -eq 1 ]]; then
+  echo "edit $ROOT/.local/models.sh with actual OpenCode model IDs, then run setup again" >&2
+  exit 1
+fi
 
-printf '[4/4] Launchers...\n'
+printf '[4/5] Installing TEAM Ensemble configuration...\n'
+mkdir -p "$HOME/.config/opencode"
+sed "s|__OPENCODE_WORKER_MODEL__|${OPENCODE_WORKER_MODEL}|g" "$ROOT/profiles/team/ensemble.json.template" > "$HOME/.config/opencode/ensemble.json"
+
+printf '[5/5] Launchers...\n'
 if [[ $INSTALL_LAUNCHERS -eq 1 ]]; then
   mkdir -p "$HOME/.local/bin"
   ln -sf "$ROOT/scripts/oc-product.sh" "$HOME/.local/bin/oc-product"
