@@ -23,6 +23,75 @@ Assert-True ($teamLead -notmatch '(?m)^model: ') 'global Team lead must inherit 
 Assert-True (@($teamProfile.plugin) -contains '@hueyexe/opencode-ensemble@0.18.0') 'Team profile must pin Ensemble 0.18.0'
 Assert-True (@($teamProfile.plugin) -contains 'superpowers@git+https://github.com/obra/superpowers.git') 'Team profile must load Superpowers'
 
+$teamAgentPaths = @(
+  'agents\team-scout.md',
+  'agents\team-builder.md',
+  'agents\team-reviewer.md'
+)
+$legacyTeamWorkflow = '(?i)matt\s+pocock|grill|to-spec|to-tickets|ticket|\bDAG\b'
+foreach ($relative in $teamAgentPaths) {
+  $path = Join-Path $Root $relative
+  Assert-True (Test-Path -LiteralPath $path) "missing $relative"
+  $content = Get-Content -LiteralPath $path -Raw
+  Assert-True ($content -notmatch $legacyTeamWorkflow) "Team agent $relative must not contain legacy workflow text"
+  Assert-True ($content -notmatch '(?m)^model: ') "Team agent $relative must inherit the configured model"
+  Assert-True ($content -match '(?m)^  task:\s*deny\s*$') "Team agent $relative must not spawn subagents"
+}
+
+$teamScout = Get-Content -LiteralPath (Join-Path $Root 'agents\team-scout.md') -Raw
+$teamBuilder = Get-Content -LiteralPath (Join-Path $Root 'agents\team-builder.md') -Raw
+$teamReviewer = Get-Content -LiteralPath (Join-Path $Root 'agents\team-reviewer.md') -Raw
+Assert-True ($teamScout -match '(?m)^  edit:\s*deny\s*$') 'team-scout must be read-only'
+Assert-True ($teamBuilder -match '(?m)^## Completion handback\s*$') 'team-builder must require evidence-based handback'
+Assert-True ($teamBuilder -match '(?m)^  webfetch:\s*deny\s*$') 'team-builder web access must be denied'
+Assert-True ($teamReviewer -match '(?m)^  edit:\s*deny\s*$') 'team-reviewer must be read-only'
+
+$secretPaths = @(
+  '**/.env', '**/.env.*', '**/secrets/**', '**/credentials/**',
+  '**/*credentials*', '**/*secret*', '**/*.pem', '**/*.key',
+  '**/id_rsa', '**/id_ed25519'
+)
+function Get-PermissionSection([string]$Content, [string]$Key) {
+  $match = [regex]::Match($Content, "(?m)^  ${Key}:\r?\n((?:    \S.*(?:\r?\n|$))+)")
+  if ($match.Success) { return $match.Groups[1].Value }
+  return ''
+}
+$teamAgents = [ordered]@{
+  'team-scout' = $teamScout
+  'team-builder' = $teamBuilder
+  'team-reviewer' = $teamReviewer
+}
+foreach ($name in $teamAgents.Keys) {
+  $readSection = Get-PermissionSection $teamAgents[$name] 'read'
+  Assert-True ($readSection.Length -gt 0) "$name must define read permissions"
+  Assert-True ($readSection -notmatch '(?m)^  \S+:') "$name read section must stop before the next permission key"
+  Assert-True (([regex]::Matches($readSection, '":\s*deny')).Count -eq $secretPaths.Count) "$name read section must contain exactly the secret denials"
+  foreach ($pattern in $secretPaths) {
+    $quoted = '"' + [regex]::Escape($pattern) + '":\s*deny'
+    Assert-True ($readSection -match $quoted) "$name must deny reading $pattern"
+  }
+}
+
+$builderEditSection = Get-PermissionSection $teamBuilder 'edit'
+Assert-True ($builderEditSection -match '"\*":\s*allow') 'team-builder must retain normal edit allow'
+Assert-True ($builderEditSection -notmatch '(?m)^  \S+:') 'team-builder edit section must stop before the next permission key'
+Assert-True (([regex]::Matches($builderEditSection, '":\s*deny')).Count -eq $secretPaths.Count) 'team-builder edit section must contain exactly the secret denials'
+foreach ($pattern in $secretPaths) {
+  $quoted = '"' + [regex]::Escape($pattern) + '":\s*deny'
+  Assert-True ($builderEditSection -match $quoted) "team-builder must deny editing $pattern"
+}
+
+$builderBashSection = Get-PermissionSection $teamBuilder 'bash'
+Assert-True ($builderBashSection -notmatch '(?m)^  \S+:') 'team-builder bash section must stop before the next permission key'
+$destructiveGit = @(
+  'git reset --hard', 'git clean', 'git branch -D', 'git push --force',
+  'git push -f', 'git push', 'git commit', 'git merge', 'git rebase'
+)
+foreach ($command in $destructiveGit) {
+  $quoted = '"' + [regex]::Escape($command) + '\*":\s*deny'
+  Assert-True ($builderBashSection -match $quoted) "team-builder must deny '$command*'"
+}
+
 $requiredPaths = @(
   'scripts\oc-team.ps1',
   'scripts\oc-team.sh',

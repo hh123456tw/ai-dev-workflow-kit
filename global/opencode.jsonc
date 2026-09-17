@@ -3,7 +3,7 @@
   "model": "openai/gpt-5.6-sol",
   "small_model": "deepseek/deepseek-v4-flash",
   "plugin": [
-    "@hueyexe/opencode-ensemble@0.17.0"
+    "@hueyexe/opencode-ensemble@0.18.0"
   ],
   "attachment": {
     "image": {

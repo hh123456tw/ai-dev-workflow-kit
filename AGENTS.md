@@ -11,11 +11,15 @@ complex bugs. Reliability > speed. Matt methodology is disabled in this mode.
 
 ## Team — `/team <request>`
 
-GPT-5.6 `team-lead` + Matt Pocock skills + OpenCode Ensemble + DeepSeek V4.1
-Flash workers. Concurrency = 2-3 (4 only if fully independent). For
-hackathons, MVPs, demos, prototypes. Dependency-driven scheduling: spawn every
-safe ready ticket at once, unblock dependents as results arrive. One ticket =
-one branch = one worktree. Superpowers is disabled in this mode.
+`team-lead` + Superpowers + selected gstack skills + conditional OpenCode
+Ensemble + DeepSeek V4.1 Flash workers. `team-lead` inherits the active global
+model. For hackathons, MVPs, demos, prototypes. Lead-controlled accelerated
+delivery: Recon -> Spine -> optional Independent Expansion -> Integration ->
+QA -> Demo Hardening. One builder by default; at most two writable workers, and
+only after the parallelization rubric passes. No new writable wave before the
+prior wave has an integrated green baseline. Parallelize discovery freely;
+parallelize code only when ownership is provably independent. Optimize for
+time-to-demo, not agent utilization.
 
 ## gstack — shared specialist toolbox
 
