@@ -21,7 +21,8 @@ Assert-True ($null -eq $team.permissions) 'TEAM must not use obsolete permission
 Assert-True ($null -eq $team.agents) 'TEAM agents must be loaded from agents/*.md, not obsolete agents key'
 Assert-True ($team.default_agent -eq 'orchestrator') 'TEAM default agent must be orchestrator'
 Assert-True ($team.subagent_depth -eq 1) 'TEAM subagent depth must be 1'
-Assert-True (@($team.plugin).Count -eq 0) 'TEAM must explicitly load no plugins'
+Assert-True (@($team.plugin) -contains '@hueyexe/opencode-ensemble@0.18.0') 'TEAM must pin Ensemble 0.18.0'
+Assert-True (@($team.plugin) -contains 'superpowers@git+https://github.com/obra/superpowers.git') 'TEAM must load Superpowers'
 
 Assert-True ($null -ne $product.permission) 'PRODUCT must use current permission key'
 Assert-True ($null -eq $product.permissions) 'PRODUCT must not use obsolete permissions key'
@@ -44,16 +45,13 @@ foreach ($relative in $requiredAgents) {
 $orchestrator = Get-Content -LiteralPath (Join-Path $Root 'profiles\team\agents\orchestrator.md') -Raw
 $worker = Get-Content -LiteralPath (Join-Path $Root 'profiles\team\agents\ds-worker.md') -Raw
 $reviewer = Get-Content -LiteralPath (Join-Path $Root 'profiles\team\agents\reviewer.md') -Raw
+$researcher = Get-Content -LiteralPath (Join-Path $Root 'profiles\team\agents\researcher.md') -Raw
 
-Assert-True ($orchestrator -match 'Contract freeze gate') 'orchestrator must enforce contract freeze'
-Assert-True ($orchestrator -match 'at most two implementation') 'orchestrator must enforce two DS attempts'
-Assert-True ($orchestrator -match 'GPT-5\.6 takeover') 'orchestrator must define GPT takeover'
-Assert-True ($worker -match 'model: deepseek/deepseek-flash') 'worker must route to verified DeepSeek model'
-Assert-True ($worker -match 'steps: 15') 'worker must have a 15-step budget'
+Assert-True ($orchestrator -match 'Parallelize discovery freely') 'orchestrator must use discovery-first policy'
+Assert-True ($worker -match 'Completion handback') 'worker must require evidence-based handback'
 Assert-True ($worker -match '(?ms)task:\s*deny') 'worker must not spawn subagents'
 Assert-True ($worker -match '(?ms)webfetch:\s*deny') 'worker web access must be denied'
-Assert-True ($worker -match '\*\*/tests/\*\*') 'worker must have static test edit denial'
-Assert-True ($reviewer -match 'model: openai/gpt-5\.6-sol') 'reviewer must route to verified GPT model'
 Assert-True ($reviewer -match '(?ms)edit:\s*deny') 'reviewer must be read-only'
+Assert-True ($researcher -match 'read-only scout') 'researcher must remain read-only'
 
 'PROFILE_BUNDLE_ACCEPTANCE_PASS'

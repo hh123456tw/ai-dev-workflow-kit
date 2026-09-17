@@ -18,6 +18,7 @@ node_modules/
 .cache/
 .opencode-cache/
 .opencode/
+.superpowers/
 .worktrees/
 *.log
 __pycache__/
