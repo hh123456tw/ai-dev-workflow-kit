@@ -7,8 +7,8 @@
   "defaultModel": "__OPENCODE_WORKER_MODEL__",
   "modelsByAgent": {
     "ds-worker": "__OPENCODE_WORKER_MODEL__",
-    "explore": "__OPENCODE_WORKER_MODEL__",
-    "explorer": "__OPENCODE_WORKER_MODEL__"
+    "researcher": "__OPENCODE_WORKER_MODEL__",
+    "reviewer": "__OPENCODE_WORKER_MODEL__"
   },
   "modelAssignment": "default",
   "promptForModels": false

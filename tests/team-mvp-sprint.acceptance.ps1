@@ -14,7 +14,22 @@ $teamPolicy = Get-Content -LiteralPath (Join-Path $Root 'profiles\team\TEAM_MVP_
 
 Assert-True ($teamCommand -match 'agent: team-lead') '/team must select team-lead'
 Assert-True ($teamLead -match 'Build the demo spine first') 'global Team lead must state the Team principle'
-Assert-True ($teamPolicy -match 'Wave 0: Recon') 'profile Team policy must define waves'
+$requiredSections = @(
+  'Core Principle',
+  'Wave 0: Recon',
+  'Wave 1: Spine',
+  'Wave 2: Independent Expansion',
+  'Wave 3: Integration',
+  'Wave 4: QA',
+  'Wave 5: Demo Hardening',
+  'Parallelization Rubric',
+  'Artifact-Based Recovery',
+  'Time-Pressure Modes'
+)
+foreach ($section in $requiredSections) {
+  Assert-True ($teamPolicy -match ('(?m)^## ' + [regex]::Escape($section) + '\s*$')) "profile Team policy must define $section"
+}
+Assert-True ($teamPolicy -match 'Build the demo spine first\. Parallelize discovery freely\. Parallelize code only when ownership is provably independent\. Integrate every wave before spawning the next\. Optimize for time-to-demo, not agent utilization\.') 'profile Team policy must state the exact Team philosophy'
 Assert-True ($teamPolicy -match 'Demo Survival Mode') 'profile Team policy must define time-pressure mode'
 Assert-True ($teamLead -match 'at most two writable workers') 'global Team lead must cap writers at two'
 Assert-True ($teamLead -notmatch 'spawn\s+EVERY\s+safe\s+ready\s+ticket') 'global Team lead must not use legacy eager DAG scheduling'

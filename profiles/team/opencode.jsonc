@@ -4,9 +4,19 @@
   "small_model": "{env:OPENCODE_WORKER_MODEL}",
   "default_agent": "orchestrator",
   "subagent_depth": 1,
-  "instructions": ["./TEAM_V2.md"],
+  "instructions": ["./TEAM_MVP_SPRINT.md"],
 
-  "plugin": ["@hueyexe/opencode-ensemble@0.17.0"],
+  "agent": {
+    "orchestrator": { "model": "{env:OPENCODE_PRIMARY_MODEL}" },
+    "ds-worker": { "model": "{env:OPENCODE_WORKER_MODEL}" },
+    "researcher": { "model": "{env:OPENCODE_WORKER_MODEL}" },
+    "reviewer": { "model": "{env:OPENCODE_WORKER_MODEL}" }
+  },
+
+  "plugin": [
+    "superpowers@git+https://github.com/obra/superpowers.git",
+    "@hueyexe/opencode-ensemble@0.18.0"
+  ],
 
   "permission": {
     "read": {
@@ -37,20 +47,20 @@
     },
     "skill": {
       "*": "deny",
-      "setup-matt-pocock-skills": "allow",
-      "grill-with-docs": "allow",
-      "grill-me": "allow",
-      "wayfinder": "allow",
-      "to-spec": "allow",
-      "to-tickets": "allow",
-      "implement": "allow",
-      "tdd": "allow",
-      "codebase-design": "allow",
-      "domain-modeling": "allow",
-      "diagnosing-bugs": "allow",
-      "code-review": "allow",
-      "research": "allow",
-      "handoff": "allow",
+      "brainstorming": "allow",
+      "dispatching-parallel-agents": "allow",
+      "executing-plans": "allow",
+      "finishing-a-development-branch": "allow",
+      "receiving-code-review": "allow",
+      "requesting-code-review": "allow",
+      "subagent-driven-development": "allow",
+      "systematic-debugging": "allow",
+      "test-driven-development": "allow",
+      "using-git-worktrees": "allow",
+      "using-superpowers": "allow",
+      "verification-before-completion": "allow",
+      "writing-plans": "allow",
+      "writing-skills": "allow",
       "qa": "allow",
       "qa-only": "allow",
       "review": "allow",
@@ -59,9 +69,7 @@
       "investigate": "allow",
       "plan-ceo-review": "allow",
       "design-review": "allow",
-      "benchmark": "allow",
-      "gstack-*": "deny",
-      "superpowers-*": "deny"
+      "benchmark": "allow"
     },
     "bash": {
       "*": "allow",
