@@ -7,14 +7,13 @@ agent definition are the source of truth; this file is the summary.
 
 | Surface | How |
 | --- | --- |
-| Normal use | Open OpenCode with the stock shortcut and run `/stable <request>` |
-| Optional wrapper | `oc-product` — same workflow, but the profile config resolves models from `.local/models.*` |
+| Normal use | Open OpenCode with the stock shortcut. `default_agent` is `stable-lead`, so the session starts as the lead. `/stable <request>` also works. |
 
-All entry surfaces resolve to the same lead definition: `agents/stable-lead.md`.
-
-OpenCode has no native `profiles/` feature; `profiles/product/opencode.jsonc` is
-just a config file that `oc-product` points `OPENCODE_CONFIG` at. There is no
-Desktop profile mechanism.
+Everything resolves to one lead definition: `agents/stable-lead.md`, deployed to
+the global agents directory. Model routing comes from `global/opencode.jsonc`.
+There is no profile, no launcher wrapper, and no per-machine model file. OpenCode
+has no native `profiles/` feature; the retired `profiles/` layout and the
+`oc-product` wrapper were removed because they carried the old workflow forward.
 
 ## Methodology
 

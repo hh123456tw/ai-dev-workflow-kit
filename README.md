@@ -34,21 +34,18 @@ flowchart TD
 
 | | 內容 |
 |---|---|
-| 入口 | 直接開 OpenCode（原始捷徑），用 `/stable <需求>` |
-| 選用入口 | `oc-product`：同一條流程，但改用 profile 的環境變數決定模型 |
-| Lead | `stable-lead`（模型由入口決定） |
-| 方法論 | Superpowers（brainstorm → plan → TDD → review → 驗證） |
+| 入口 | 直接開 OpenCode（原始捷徑）。`default_agent` 已設為 `stable-lead`，session 一開始就是 lead；也可隨時打 `/stable <需求>` |
+| Lead | `stable-lead`，模型由全域 config 決定 |
+| 方法論 | Superpowers（brainstorm → plan → TDD → review → 驗證），由全域 plugin 載入 |
 | Worker | 需要時一位 DeepSeek V4.1 Flash，條件見下 |
 | 執行層 | 循序；不使用任何多 agent orchestration |
 | 核心取捨 | 每個成功切片的成本，不是每百萬 token 的價格 |
 
 ## 怎麼開
 
-**平常就用原始捷徑開 OpenCode，然後打 `/stable`。** 不需要切 profile、不需要特別的啟動方式。Superpowers 由全域 config 的 plugin 提供，`stable-lead` 由 setup 部署到全域 agents。
+**就用原始捷徑開 OpenCode。** 不需要切 profile、不需要額外的 launcher、不需要設定環境變數。全域 config 已載入 Superpowers plugin，`stable-lead` 與四個 DeepSeek worker 由 setup 部署到全域 agents 目錄。
 
-`oc-product` 是選用的替代入口：它會把 `OPENCODE_CONFIG` 指向 `profiles/product/opencode.jsonc`，讓模型改用 `.local/models.ps1` 裡的 `OPENCODE_PRIMARY_MODEL` / `OPENCODE_WORKER_MODEL` 決定，而不是吃全域 config 的固定模型。想要可攜的模型設定時再用它。
-
-本 repo 沒有、也不需要任何「Desktop profile」機制：OpenCode 本身不支援 `profiles/` 這個概念（套件內沒有任何相關程式碼）。
+早期版本有一個 `oc-product` wrapper 與 `profiles/product` 設定，用來把模型選擇外部化到 `.local/models.*`。那組已經移除：模型直接寫在全域 config，而 `oc-product` 正是舊流程殘留的來源。OpenCode 本身也不支援 `profiles/` 這個概念（套件內沒有任何相關程式碼）。
 
 ## 委派條件
 
@@ -85,16 +82,12 @@ Demo Survival 期間禁止 refactor、升級依賴、架構清理、schema migra
 git clone https://github.com/hh123456tw/opencode-dual-workflow-kit.git
 Set-Location opencode-dual-workflow-kit
 Set-ExecutionPolicy -Scope Process Bypass
-./scripts/setup-windows.ps1 -InstallLaunchers
+./scripts/setup-windows.ps1
 ```
 
-setup 會依序：裝 gstack → 建 `.local/models.ps1`（已預填驗證過的模型 ID，第一次會停下來請你確認）→ 部署全域 agents／commands（`stable-lead` 與 DeepSeek workers，以及 `/stable`、`/gstack-*` 指令）→ 補全域 config 與 gstack 路由（缺失才裝）→ 清掉 3 份以前的舊備份。若 `~/.config/opencode/opencode.jsonc` 已存在，setup 只會印出警告並保留原檔，不會改寫你的全域設定。完成本機 provider 認證後：
+setup 會依序：裝 gstack → 部署全域 agents／commands（`stable-lead`、四個 DeepSeek worker、`/stable`、`/gstack-*`）→ 補全域 config 與 gstack 路由（缺失才裝）→ 清掉 3 份以前的舊備份。若 `~/.config/opencode/opencode.jsonc` 已存在，setup 只會印出警告並保留原檔，不會改寫你的全域設定。
 
-```powershell
-oc-product
-```
-
-或在任何專案直接用 `/stable`。
+完成本機 provider 認證後直接開 OpenCode 即可。若機器上還留著舊版的 `oc-product`、`profiles/product*`、`team-*`、`ensemble.*`，加上 `-CleanLegacy` 可一次清掉。
 
 ## macOS/Linux 安裝
 
@@ -102,20 +95,20 @@ oc-product
 git clone https://github.com/hh123456tw/opencode-dual-workflow-kit.git
 cd opencode-dual-workflow-kit
 chmod +x scripts/*.sh
-./scripts/setup-unix.sh --install-launchers
+./scripts/setup-unix.sh
 ```
 
-流程同 Windows，用 `oc-product` 啟動。注意：unix 腳本尚未在 bash 環境完整實測過，回報問題請附 log。
+流程同 Windows，舊產物清理用 `--clean-legacy`。注意：unix 腳本尚未在 bash 環境完整實測過，回報問題請附 log。
 
 ## 學習與還原
 
 學到的教訓由 lead 在收尾時提煉，經使用者批准後寫入當專案的 AGENTS.md（兩次才入選、40 行預算、流水帳另存 `docs/learnings/`）。
 
-還原步驟見 [`docs/restore-checklist.md`](docs/restore-checklist.md)。重點只有三件：跑 setup、登入 provider（`opencode auth login`）、確認 `opencode models` 看得到 GPT-5.6 與 DeepSeek。
+還原步驟見 [`docs/restore-checklist.md`](docs/restore-checklist.md)。
 
 ## 安全性
 
-絕不可 commit `.local/`、provider 憑證、OAuth 狀態、worktree 或 runtime database。詳見 [SECURITY.md](SECURITY.md)。
+絕不可 commit provider 憑證、OAuth 狀態、worktree 或 runtime database。詳見 [SECURITY.md](SECURITY.md)。
 
 ## 上游專案
 

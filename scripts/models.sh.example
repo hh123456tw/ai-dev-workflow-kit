@@ -1,4 +1,0 @@
-# Copy to ../.local/models.sh and verify values with OpenCode /models.
-# Do NOT put API keys here. Verified 2026-09-15 via `opencode models`.
-export OPENCODE_PRIMARY_MODEL='openai/gpt-5.6-sol'
-export OPENCODE_WORKER_MODEL='deepseek/deepseek-v4-flash'

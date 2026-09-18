@@ -23,24 +23,25 @@ RETIRED_WORKFLOW = re.compile(
     r"(?i)matt\s+pocock|grill|to-spec|to-tickets|wayfinder|\bDAG\b|TEAM V2|Ensemble"
 )
 
-# The retired multi-agent artifacts that must no longer exist anywhere.
+# Retired artifacts that must no longer exist anywhere in the repo.
 RETIRED_PATHS = [
+    "profiles",
+    "profiles/product/opencode.jsonc",
     "profiles/team/opencode.jsonc",
     "profiles/team/TEAM_MVP_SPRINT.md",
     "profiles/team/ensemble.json.template",
-    "profiles/team/agents/orchestrator.md",
-    "profiles/team/agents/ds-worker.md",
-    "profiles/team/agents/researcher.md",
-    "profiles/team/agents/reviewer.md",
-    "profiles/product/PRODUCT.md",
-    "profiles/product/agents/product.md",
     "agents/team-lead.md",
     "agents/team-scout.md",
     "agents/team-builder.md",
     "agents/team-reviewer.md",
     "commands/team.md",
+    "scripts/oc-product.ps1",
+    "scripts/oc-product.sh",
     "scripts/oc-team.ps1",
     "scripts/oc-team.sh",
+    "scripts/models.ps1.example",
+    "scripts/models.sh.example",
+    ".local/README.md",
     "workflows/team-v2.md",
     "prompts/team-v2-upgrade.md",
     "prompts/original-dual-workflow-brief.md",
@@ -73,35 +74,17 @@ class SingleWorkflowBundleTest(unittest.TestCase):
         for relative in RETIRED_PATHS:
             self.assertFalse((ROOT / relative).exists(), relative)
 
-    def test_the_single_profile_matches_the_contract(self) -> None:
-        profile = self.read_json("profiles/product/opencode.jsonc")
+    def test_the_global_config_is_the_single_entry_point(self) -> None:
+        global_config = self.read_json("global/opencode.jsonc")
 
-        self.assertIn("permission", profile)
-        self.assertNotIn("permissions", profile)
-        self.assertNotIn("agents", profile)
-        self.assertNotIn("instructions", profile)
-        self.assertEqual(profile["default_agent"], "stable-lead")
-        self.assertEqual(profile["subagent_depth"], 1)
-        self.assertEqual(profile["model"], "{env:OPENCODE_PRIMARY_MODEL}")
-        self.assertEqual(profile["small_model"], "{env:OPENCODE_WORKER_MODEL}")
+        self.assertEqual(global_config["default_agent"], "stable-lead")
+        self.assertEqual(global_config["model"], "openai/gpt-5.6-sol")
+        self.assertEqual(global_config["small_model"], "deepseek/deepseek-v4-flash")
         self.assertEqual(
-            profile["plugin"],
+            global_config["plugin"],
             ["superpowers@git+https://github.com/obra/superpowers.git"],
         )
-
-        for pattern in SECRET_PATHS:
-            self.assertEqual(profile["permission"]["read"][pattern], "deny", pattern)
-            self.assertEqual(profile["permission"]["edit"][pattern], "deny", pattern)
-        for command in (
-            "git reset --hard*",
-            "git clean*",
-            "git branch -D*",
-            "git push --force*",
-            "git push -f*",
-        ):
-            self.assertEqual(profile["permission"]["bash"][command], "deny", command)
-        for command in ("git rebase*", "git push*"):
-            self.assertEqual(profile["permission"]["bash"][command], "ask", command)
+        self.assertNotIn("opencode-ensemble", self.read_text("global/opencode.jsonc"))
 
     def test_the_lead_definition_carries_the_single_workflow_policy(self) -> None:
         lead = self.read_text("agents/stable-lead.md")
@@ -190,7 +173,7 @@ class SingleWorkflowBundleTest(unittest.TestCase):
         self.assertRegex(test_writer, re.compile(r'(?m)^    "\*": deny\s*$'))
         self.assertRegex(test_writer, re.compile(r'(?m)^    "\*\*/tests/\*\*": allow\s*$'))
 
-    def test_shared_commands_and_agents_are_deployed_by_setup(self) -> None:
+    def test_shared_commands_and_agents_exist(self) -> None:
         for relative in (
             "agents/stable-lead.md",
             "agents/explorer.md",
@@ -207,13 +190,10 @@ class SingleWorkflowBundleTest(unittest.TestCase):
             "commands/gstack-design-review.md",
             "commands/gstack-benchmark.md",
             "AGENTS.md",
-            "scripts/oc-product.ps1",
-            "scripts/oc-product.sh",
         ):
             self.assertTrue((ROOT / relative).is_file(), relative)
 
-        stable_cmd = self.read_text("commands/stable.md")
-        self.assertIn("agent: stable-lead", stable_cmd)
+        self.assertIn("agent: stable-lead", self.read_text("commands/stable.md"))
 
         lead = self.read_text("agents/stable-lead.md")
         self.assertIn("Compound learning", lead)
@@ -226,8 +206,16 @@ class SingleWorkflowBundleTest(unittest.TestCase):
         self.assertIn("單一工作流", readme)
         self.assertNotIn("/team", readme)
         self.assertNotIn("oc-team", readme)
-        self.assertIn("oc-product", readme)
+        self.assertIn("原始捷徑", readme)
         self.assertIn("```mermaid", readme)
+        # The README may explain that the wrapper was retired; it must not
+        # advertise it as an entry point (a table row or a bare command line).
+        entry_lines = [
+            line
+            for line in readme.splitlines()
+            if re.match(r"^\s*\|.*oc-product", line) or re.match(r"^\s*oc-product", line)
+        ]
+        self.assertEqual(entry_lines, [], "README must not list oc-product as an entry point")
 
         agents_doc = self.read_text("AGENTS.md")
         self.assertIn("One workflow", agents_doc)
@@ -238,53 +226,33 @@ class SingleWorkflowBundleTest(unittest.TestCase):
         self.assertIn("Keep exactly **one workflow**", spec)
         self.assertIn("cost per successful slice", spec)
 
-    def test_windows_setup_deploys_and_offers_legacy_cleanup(self) -> None:
-        setup = self.read_text("scripts/setup-windows.ps1")
-        self.assertIn(".local", setup)
-        self.assertIn("models.ps1", setup)
-        self.assertIn("agents\\*.md", setup)
-        self.assertIn("commands\\*.md", setup)
-        self.assertIn("backup_*", setup)
-        self.assertIn("CleanLegacy", setup)
-        self.assertIn("stable-lead.md", setup)
-        self.assertIn("team-lead.md", setup)
-        self.assertIn("ensemble.json", setup)
-        self.assertNotIn("mattpocock/skills", setup)
-        self.assertNotIn("profiles\\team\\skills", setup)
-        self.assertNotIn("ensemble.json.template", setup)
-        self.assertNotIn("oc-team", setup)
+    def test_setup_scripts_deploy_globally_and_offer_legacy_cleanup(self) -> None:
+        win = self.read_text("scripts/setup-windows.ps1")
+        unix = self.read_text("scripts/setup-unix.sh")
 
-    def test_unix_setup_matches_windows_setup(self) -> None:
-        setup = self.read_text("scripts/setup-unix.sh")
-        self.assertIn(".local", setup)
-        self.assertIn("models.sh", setup)
-        self.assertIn("agents/*.md", setup)
-        self.assertIn("commands/*.md", setup)
-        self.assertIn("--clean-legacy", setup)
-        self.assertIn("stable-lead.md", setup)
-        self.assertIn("team-lead.md", setup)
-        self.assertIn("ensemble.json", setup)
-        self.assertNotIn("mattpocock/skills", setup)
-        self.assertNotIn("profiles/team/skills", setup)
-        self.assertNotIn("ensemble.json.template", setup)
-        self.assertNotIn("oc-team", setup)
+        for name, setup in (("windows", win), ("unix", unix)):
+            self.assertIn("stable-lead.md", setup, name)
+            self.assertIn("agents", setup, name)
+            self.assertIn("commands", setup, name)
+            self.assertIn("team-lead.md", setup, name)
+            self.assertIn("ensemble.json", setup, name)
+            self.assertNotIn("ensemble.json.template", setup, name)
+            self.assertNotIn("mattpocock/skills", setup, name)
+            self.assertNotIn("oc-team", setup, name)
+            self.assertNotIn("oc-product", setup, name)
+            self.assertNotIn("models.ps1.example", setup, name)
+            self.assertNotIn("models.sh.example", setup, name)
 
-    def test_portable_global_and_gstack_configs(self) -> None:
-        for relative in ("global/opencode.jsonc", "gstack/gstack.jsonc"):
-            path = ROOT / relative
-            self.assertTrue(path.is_file(), relative)
-            parsed = json.loads(path.read_text(encoding="utf-8"))
-            self.assertNotIn("permissions", parsed)
+        self.assertIn("CleanLegacy", win)
+        self.assertIn("--clean-legacy", unix)
+        self.assertIn("backup_*", win)
+        self.assertIn("backup_*", unix)
 
-        global_config = self.read_json("global/opencode.jsonc")
-        self.assertEqual(global_config["model"], "openai/gpt-5.6-sol")
-        self.assertEqual(global_config["small_model"], "deepseek/deepseek-v4-flash")
-        self.assertNotIn("plugin", global_config)
-        self.assertNotIn("opencode-ensemble", json.dumps(global_config))
-
-        setup = self.read_text("scripts/setup-windows.ps1")
-        self.assertIn("global\\opencode.jsonc", setup)
-        self.assertIn("gstack\\gstack.jsonc", setup)
+    def test_gstack_config_is_portable(self) -> None:
+        path = ROOT / "gstack/gstack.jsonc"
+        self.assertTrue(path.is_file())
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+        self.assertNotIn("permissions", parsed)
 
 
 if __name__ == "__main__":

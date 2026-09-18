@@ -33,83 +33,38 @@ function Get-Body([string]$Content) {
   return $Content
 }
 
-# --- Exactly one workflow -----------------------------------------------------
+# --- Exactly one workflow, entered through the stock OpenCode shortcut ---------
 
-Assert-True (-not (Test-Path -LiteralPath (Join-Path $Root 'profiles\team\opencode.jsonc'))) 'the retired Team profile must not exist'
-Assert-True (-not (Test-Path -LiteralPath (Join-Path $Root 'profiles\team\TEAM_MVP_SPRINT.md'))) 'the retired Team policy must not exist'
-Assert-True (-not (Test-Path -LiteralPath (Join-Path $Root 'profiles\team\agents\orchestrator.md'))) 'the retired Team agents must not exist'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $Root 'profiles'))) 'no profile directory should exist; the workflow is global'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $Root 'scripts\oc-product.ps1'))) 'the retired oc-product launcher must not exist'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $Root 'scripts\oc-product.sh'))) 'the retired oc-product launcher must not exist'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $Root 'scripts\models.ps1.example'))) 'the retired model-file mechanism must not exist'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $Root 'scripts\models.sh.example'))) 'the retired model-file mechanism must not exist'
 Assert-True (-not (Test-Path -LiteralPath (Join-Path $Root 'agents\team-lead.md'))) 'the retired team-lead agent must not exist'
 Assert-True (-not (Test-Path -LiteralPath (Join-Path $Root 'commands\team.md'))) 'the retired /team command must not exist'
-Assert-True (-not (Test-Path -LiteralPath (Join-Path $Root 'scripts\oc-team.ps1'))) 'the retired oc-team launcher must not exist'
-Assert-True (-not (Test-Path -LiteralPath (Join-Path $Root 'scripts\oc-team.sh'))) 'the retired oc-team launcher must not exist'
 Assert-True (Test-Path -LiteralPath (Join-Path $Root 'commands\stable.md')) '/stable must remain the entry command'
-Assert-True (Test-Path -LiteralPath (Join-Path $Root 'scripts\oc-product.ps1')) 'oc-product launcher must remain'
-Assert-True (Test-Path -LiteralPath (Join-Path $Root 'scripts\oc-product.sh')) 'oc-product launcher must remain'
+Assert-True (Test-Path -LiteralPath (Join-Path $Root 'agents\stable-lead.md')) 'the lead definition must exist'
 
 $singleWorkflowSpec = Read-Text 'docs\superpowers\specs\2026-09-18-single-workflow-design.md'
 Assert-True ($singleWorkflowSpec -match 'Keep exactly \*\*one workflow\*\*') 'the single-workflow spec must state the one-workflow decision'
 Assert-True ($singleWorkflowSpec -match 'cost per successful slice') 'the spec must state the cost-per-successful-slice measurement rule'
 
-# --- No multi-agent layer remains in active configuration ---------------------
+# --- The global configuration is the entry point ------------------------------
 
-$activeFiles = @(
-  'profiles\product\opencode.jsonc',
-  'global\opencode.jsonc',
-  'agents\stable-lead.md',
-  'AGENTS.md',
-  'README.md'
-)
-foreach ($relative in $activeFiles) {
-  $content = Read-Text $relative
-  Assert-True ($content -notmatch 'opencode-ensemble') "$relative must not reference the retired Ensemble plugin"
-  Assert-True ($content -notmatch '(?i)mattpocock/skills') "$relative must not install Matt skills"
-}
+$global = Read-Json 'global\opencode.jsonc'
+Assert-True ($global.default_agent -eq 'stable-lead') 'global config must start sessions as stable-lead'
+Assert-True ($global.model -eq 'openai/gpt-5.6-sol') 'global config must pin the primary model'
+Assert-True ($global.small_model -eq 'deepseek/deepseek-v4-flash') 'global config must pin the worker model'
+Assert-True (@($global.plugin) -contains 'superpowers@git+https://github.com/obra/superpowers.git') 'global config must load Superpowers'
 
-# The setup scripts may name the retired plugin only to warn about leftovers; they
-# must not install or copy any multi-agent artifact, and must offer to clean up.
-foreach ($relative in @('scripts\setup-windows.ps1', 'scripts\setup-unix.sh')) {
-  $content = Read-Text $relative
-  Assert-True ($content -notmatch 'ensemble\.json\.template') "$relative must not install an Ensemble template"
-  Assert-True ($content -notmatch '(?i)mattpocock/skills') "$relative must not install Matt skills"
-  Assert-True ($content -match 'team-lead\.md') "$relative must list the retired team-lead agent for cleanup"
-  Assert-True ($content -match 'ensemble\.json') "$relative must list the retired Ensemble config for cleanup"
-}
-
-# --- The single profile -------------------------------------------------------
-
-$profile = Read-Json 'profiles\product\opencode.jsonc'
-Assert-True ($null -ne $profile.permission) 'profile must use the current permission key'
-Assert-True ($null -eq $profile.permissions) 'profile must not use the obsolete permissions key'
-Assert-True ($null -eq $profile.agents) 'profile agents must be loaded from agents/*.md'
-Assert-True ($null -eq $profile.instructions) 'profile must not duplicate policy in an instructions file'
-Assert-True ($profile.default_agent -eq 'stable-lead') 'profile must default to the shared stable-lead definition'
-Assert-True ($profile.subagent_depth -eq 1) 'profile subagent depth must be 1'
-Assert-True ($profile.model -eq '{env:OPENCODE_PRIMARY_MODEL}') 'profile model must resolve from OPENCODE_PRIMARY_MODEL'
-Assert-True ($profile.small_model -eq '{env:OPENCODE_WORKER_MODEL}') 'profile small_model must resolve from OPENCODE_WORKER_MODEL'
-Assert-True (@($profile.plugin).Count -eq 1) 'profile must load exactly one plugin'
-Assert-True (@($profile.plugin) -contains 'superpowers@git+https://github.com/obra/superpowers.git') 'profile must load Superpowers'
-
-$secretPaths = @(
-  '**/.env', '**/.env.*', '**/secrets/**', '**/credentials/**',
-  '**/*credentials*', '**/*secret*', '**/*.pem', '**/*.key',
-  '**/id_rsa', '**/id_ed25519'
-)
-foreach ($pattern in $secretPaths) {
-  Assert-True ($profile.permission.read.PSObject.Properties[$pattern].Value -eq 'deny') "profile must deny reading $pattern"
-  Assert-True ($profile.permission.edit.PSObject.Properties[$pattern].Value -eq 'deny') "profile must deny editing $pattern"
-}
-foreach ($command in @('git reset --hard*', 'git clean*', 'git branch -D*', 'git push --force*', 'git push -f*')) {
-  Assert-True ($profile.permission.bash.PSObject.Properties[$command].Value -eq 'deny') "profile must deny '$command'"
-}
-foreach ($command in @('git rebase*', 'git push*')) {
-  Assert-True ($profile.permission.bash.PSObject.Properties[$command].Value -eq 'ask') "profile must gate '$command'"
-}
+$globalRaw = Read-Text 'global\opencode.jsonc'
+Assert-True ($globalRaw -notmatch 'opencode-ensemble') 'global config must not reference the retired Ensemble plugin'
 
 # --- The single lead definition ----------------------------------------------
 
 $lead = Read-Text 'agents\stable-lead.md'
-Assert-True ($lead -notmatch '(?m)^model:\s') 'lead must not pin a model; each surface config selects it'
-Assert-True ($lead -match 'One workflow') 'lead must declare the single workflow'
+Assert-True ($lead -notmatch '(?m)^model:\s') 'lead must not pin a model; config selects it'
+Assert-True ($lead -match 'There is one workflow') 'lead must declare the single workflow'
 Assert-True ($lead -match 'At most one writer is active at a time') 'lead must cap writers at one'
 Assert-True ($lead -match 'Delegation is conditional, not automatic') 'lead must state the conditional delegation rule'
 Assert-True ($lead -match 'its result can be reverted independently') 'lead must state the independent-rollback condition'
@@ -137,6 +92,12 @@ $explorer = Read-Text 'agents\explorer.md'
 $implementer = Read-Text 'agents\implementer.md'
 $reviewer = Read-Text 'agents\reviewer.md'
 $testWriter = Read-Text 'agents\test-writer.md'
+
+$secretPaths = @(
+  '**/.env', '**/.env.*', '**/secrets/**', '**/credentials/**',
+  '**/*credentials*', '**/*secret*', '**/*.pem', '**/*.key',
+  '**/id_rsa', '**/id_ed25519'
+)
 
 foreach ($worker in @{ explorer = $explorer; implementer = $implementer; reviewer = $reviewer; 'test-writer' = $testWriter }.GetEnumerator()) {
   $name = $worker.Key
@@ -179,7 +140,11 @@ $readme = Read-Text 'README.md'
 Assert-True ($readme -match '單一工作流') 'README must describe a single workflow'
 Assert-True ($readme -notmatch '/team') 'README must not advertise the retired /team entry'
 Assert-True ($readme -notmatch 'oc-team') 'README must not advertise the retired oc-team launcher'
-Assert-True ($readme -match 'oc-product') 'README must document the oc-product launcher'
+Assert-True ($readme -match '原始捷徑') 'README must document the stock-shortcut entry'
+# The README may explain that the wrapper was retired; it must not advertise it as
+# an entry point (a table row or a bare command line).
+$readmeEntryLines = @($readme -split "`r?`n" | Where-Object { $_ -match '^\s*\|.*oc-product' -or $_ -match '^\s*oc-product' })
+Assert-True ($readmeEntryLines.Count -eq 0) 'README must not list oc-product as an entry point'
 
 $agentsDoc = Read-Text 'AGENTS.md'
 Assert-True ($agentsDoc -match 'One workflow') 'AGENTS.md must declare one workflow'
@@ -188,11 +153,17 @@ Assert-True ($agentsDoc -match 'cost per successful slice') 'AGENTS.md must stat
 
 $setupWin = Read-Text 'scripts\setup-windows.ps1'
 $setupUnix = Read-Text 'scripts\setup-unix.sh'
+foreach ($setup in @($setupWin, $setupUnix)) {
+  Assert-True ($setup -match 'stable-lead\.md') 'setup must deploy the lead definition'
+  Assert-True ($setup -match 'ensemble\.json') 'setup must list the retired Ensemble config for cleanup'
+  Assert-True ($setup -match 'team-lead\.md') 'setup must list the retired team-lead agent for cleanup'
+  Assert-True ($setup -notmatch 'ensemble\.json\.template') 'setup must not install an Ensemble template'
+  Assert-True ($setup -notmatch '(?i)mattpocock/skills') 'setup must not install Matt skills'
+  Assert-True ($setup -notmatch 'oc-team') 'setup must not install the retired launcher'
+  Assert-True ($setup -notmatch 'oc-product') 'setup must not install the retired wrapper'
+  Assert-True ($setup -notmatch 'models\.(ps1|sh)\.example') 'setup must not reference the retired model-file mechanism'
+}
 Assert-True ($setupWin -match 'CleanLegacy') 'Windows setup must offer the legacy cleanup switch'
 Assert-True ($setupUnix -match '--clean-legacy') 'Unix setup must offer the legacy cleanup flag'
-Assert-True ($setupWin -notmatch 'oc-team') 'Windows setup must not install the retired launcher'
-Assert-True ($setupUnix -notmatch 'oc-team') 'Unix setup must not install the retired launcher'
-Assert-True ($setupWin -match "stable-lead\.md") 'Windows setup must deploy the lead definition'
-Assert-True ($setupUnix -match 'stable-lead\.md') 'Unix setup must deploy the lead definition'
 
 'PROFILE_BUNDLE_ACCEPTANCE_PASS'
