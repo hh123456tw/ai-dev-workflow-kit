@@ -34,12 +34,21 @@ flowchart TD
 
 | | 內容 |
 |---|---|
-| 入口 | `/stable <需求>`、Desktop profile `profiles/product`、CLI `oc-product` |
-| Lead | `stable-lead`（模型由各入口的 config 決定） |
+| 入口 | 直接開 OpenCode（原始捷徑），用 `/stable <需求>` |
+| 選用入口 | `oc-product`：同一條流程，但改用 profile 的環境變數決定模型 |
+| Lead | `stable-lead`（模型由入口決定） |
 | 方法論 | Superpowers（brainstorm → plan → TDD → review → 驗證） |
 | Worker | 需要時一位 DeepSeek V4.1 Flash，條件見下 |
 | 執行層 | 循序；不使用任何多 agent orchestration |
 | 核心取捨 | 每個成功切片的成本，不是每百萬 token 的價格 |
+
+## 怎麼開
+
+**平常就用原始捷徑開 OpenCode，然後打 `/stable`。** 不需要切 profile、不需要特別的啟動方式。Superpowers 由全域 config 的 plugin 提供，`stable-lead` 由 setup 部署到全域 agents。
+
+`oc-product` 是選用的替代入口：它會把 `OPENCODE_CONFIG` 指向 `profiles/product/opencode.jsonc`，讓模型改用 `.local/models.ps1` 裡的 `OPENCODE_PRIMARY_MODEL` / `OPENCODE_WORKER_MODEL` 決定，而不是吃全域 config 的固定模型。想要可攜的模型設定時再用它。
+
+本 repo 沒有、也不需要任何「Desktop profile」機制：OpenCode 本身不支援 `profiles/` 這個概念（套件內沒有任何相關程式碼）。
 
 ## 委派條件
 

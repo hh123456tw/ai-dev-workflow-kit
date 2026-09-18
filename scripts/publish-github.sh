@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-NAME="${1:-opencode-dev-profiles}"
+NAME="${1:-opencode-dual-workflow-kit}"
 VISIBILITY="${2:-private}"
 [[ "$VISIBILITY" == private || "$VISIBILITY" == public ]] || { echo 'visibility must be private or public' >&2; exit 2; }
 command -v gh >/dev/null || { echo 'GitHub CLI (gh) required. Install it and run: gh auth login' >&2; exit 1; }
