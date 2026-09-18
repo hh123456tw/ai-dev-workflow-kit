@@ -1,46 +1,71 @@
-# AI Development Modes
+# Single Development Workflow
 
-Two independent workflows. Prompt is source of truth; details live in each
-lead agent's config, not here.
+One workflow. No modes, no multi-agent orchestration. The prompt and the lead
+agent definition are the source of truth; this file is the summary.
 
-## Stable — `/stable <request>`
+## Entry surfaces
 
-GPT-5.6 `stable-lead` + Superpowers + DeepSeek V4.1 Flash. Concurrency = 1, no
-Ensemble. For production, portfolio, auth/payment/security, migrations,
-complex bugs. Reliability > speed. Matt methodology is disabled in this mode.
+| Surface | How |
+| --- | --- |
+| Global slash command | `/stable <request>` |
+| Desktop profile | `profiles/product` |
+| CLI launcher | `oc-product` |
 
-## Team — `/team <request>`
+All three resolve to the same lead definition: `agents/stable-lead.md`.
 
-`team-lead` + Superpowers + selected gstack skills + conditional OpenCode
-Ensemble + DeepSeek V4.1 Flash workers. `team-lead` inherits the active global
-model. For hackathons, MVPs, demos, prototypes. Lead-controlled accelerated
-delivery: Recon -> Spine -> optional Independent Expansion -> Integration ->
-QA -> Demo Hardening. One builder by default; at most two writable workers, and
-only after the parallelization rubric passes. No new writable wave before the
-prior wave has an integrated green baseline. Parallelize discovery freely;
-parallelize code only when ownership is provably independent. Optimize for
-time-to-demo, not agent utilization.
+## Methodology
 
-## gstack — shared specialist toolbox
+Superpowers: brainstorming, planning, TDD, systematic debugging, worktree
+isolation, subagent-driven development, verification-before-completion. Matt
+Pocock methodology skills are denied in every agent definition and are not
+installed by setup.
 
-Selected skills only, via namespaced commands: `/gstack-qa`,
-`/gstack-review`, `/gstack-ship`, `/gstack-cso`, `/gstack-investigate`,
-`/gstack-plan-ceo-review`, `/gstack-design-review`, `/gstack-benchmark`.
-Never a third methodology; used after verification/integration.
+## Scaling is automatic
 
-## Model Routing
+The user does not choose a mode. The lead reads the scope and any stated deadline
+and applies the matching discipline: Build (over 6 hours), Feature Freeze (2 to 6
+hours), or Demo Survival (under 2 hours). With no stated deadline the lead uses
+Build discipline and says so. Never invent a deadline.
 
-Thinking, architecture, spec, tickets, integration, final review: GPT-5.6.
-Exploration, implementation, tests, mechanical work: DeepSeek V4.1 Flash.
+## Writing rules
 
-## Escalation Rules
+- Lead implements directly by default.
+- At most one writer at a time.
+- Delegate one bounded DeepSeek worker only when all four hold: distinct file
+  ownership; no shared route, state, schema, config, or mutable fixture;
+  independent acceptance check; independent rollback.
+- Never delegate to create the appearance of parallelism.
 
-Workers report architecture/spec conflicts, ambiguous criteria, destructive DB
-changes, security-sensitive design, and test-vs-spec disagreement to the lead.
-They never redefine requirements.
+## Evidence rules
+
+- Progress is judged by artifacts, not status messages.
+- No wall-clock reporting requirement is placed on any agent.
+- A handback without changed files, exact commands and results, the acceptance
+  result, and remaining limitations is rejected.
+- No PASS without executed evidence. No self-approval. No faked, weakened, or
+  deleted tests.
+- Never start new work from a red baseline.
+
+## Model routing
+
+- Lead: the primary model, resolved by each surface's config.
+- Bounded workers: DeepSeek V4.1 Flash, pinned in the worker agent definitions.
+
+## Safety
+
+- Never expose or commit credentials; credential paths are denied in every agent.
+- Destructive git operations are denied; `git rebase` and `git push` ask first.
+- Escalate architecture, auth/payment/security, migration, and test-vs-spec
+  conflicts instead of guessing.
 
 ## Definition of Done
 
-Acceptance GREEN observed by the lead + regression GREEN + typecheck/lint
-GREEN + independent review PASS. No PASS without executed evidence. No
-self-approval. No faked, weakened, or deleted tests.
+Acceptance GREEN observed by the lead + relevant regression GREEN +
+typecheck/lint GREEN + independent review addressed + the lead's final gate. Only
+then merge. After merge, optionally run gstack review, qa, cso, then ship.
+
+## Measurement
+
+Compare process variants by cost per successful slice, never cost per million
+tokens. The numbers that matter are wall-clock time, total cost, human
+interventions, and one-shot success.

@@ -1,12 +1,12 @@
 ---
-description: STABLE MODE entry. GPT-5.6 stable-lead + Superpowers + DeepSeek, sequential, high verification. For production, portfolio, auth/payment/security work.
+description: Single workflow entry. Superpowers methodology, one writer at a time, evidence-based verification. Scales automatically from production work to time-boxed MVP delivery.
 agent: stable-lead
-model: openai/gpt-5.6-sol
 ---
 
-Run STABLE MODE for this request: $ARGUMENTS
+Run the single workflow for this request: $ARGUMENTS
 
-Act as stable-lead: clarify, architect, plan with Superpowers, dispatch ONE
-DeepSeek worker at a time (RED then GREEN), independently review, verify with
-executed evidence, then merge. Concurrency is 1. Never start Matt methodology
-or Ensemble teams. Never claim PASS without running the checks.
+Act as stable-lead: scope the smallest demo-able outcome, architect and plan with
+Superpowers, implement directly, and delegate at most one bounded DeepSeek worker
+only when the four delegation conditions hold. Independently review, verify with
+executed evidence, then integrate. Never claim PASS without running the checks.
+Never start a parallel writer team.
