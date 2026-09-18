@@ -2,11 +2,18 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INSTALL_LAUNCHERS=0
-[[ "${1:-}" == "--install-launchers" ]] && INSTALL_LAUNCHERS=1
+CLEAN_LEGACY=0
+for arg in "$@"; do
+  case "$arg" in
+    --install-launchers) INSTALL_LAUNCHERS=1 ;;
+    --clean-legacy) CLEAN_LEGACY=1 ;;
+    *) echo "unknown option: $arg" >&2; exit 1 ;;
+  esac
+done
 command -v git >/dev/null || { echo 'git required' >&2; exit 1; }
 command -v opencode >/dev/null || { echo 'opencode required' >&2; exit 1; }
 
-printf '[0/7] Pruning old backups (keep newest 3)...\n'
+printf '[0/5] Pruning old backups (keep newest 3)...\n'
 BACKUP_ROOT="$HOME/.config/opencode"
 if [[ -d "$BACKUP_ROOT" ]]; then
   i=0
@@ -16,33 +23,18 @@ if [[ -d "$BACKUP_ROOT" ]]; then
   done
 fi
 
-printf '[1/7] Preparing TEAM Matt skills...\n'
-TEAM="$ROOT/profiles/team/skills"
-mkdir -p "$TEAM"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-git clone --depth 1 https://github.com/mattpocock/skills.git "$TMP/matt"
-wanted=(setup-matt-pocock-skills grill-with-docs grill-me wayfinder to-spec to-tickets implement tdd codebase-design domain-modeling diagnosing-bugs code-review research resolving-merge-conflicts handoff)
-for name in "${wanted[@]}"; do
-  src="$(find "$TMP/matt/skills" -type f -name SKILL.md -path "*/$name/SKILL.md" -print -quit | xargs -r dirname)"
-  if [[ -z "$src" ]]; then echo "warning: Matt skill not found upstream: $name" >&2; continue; fi
-  rm -rf "$TEAM/$name"
-  cp -R "$src" "$TEAM/$name"
-  echo "  installed Matt skill: $name"
-done
-
-printf '[2/7] Installing/updating gstack...\n'
+printf '[1/5] Installing/updating gstack...\n'
 GSTACK="$HOME/.local/share/gstack"
 mkdir -p "$(dirname "$GSTACK")"
 if [[ -d "$GSTACK/.git" ]]; then git -C "$GSTACK" pull --ff-only; else git clone https://github.com/garrytan/gstack.git "$GSTACK"; fi
-# NOTE: gstack installs skills flat (no namespace). The selected toolbox used by
-# STABLE/TEAM modes is qa, qa-only, review, ship, cso, investigate,
-# plan-ceo-review, design-review, benchmark. Namespaced entry points
-# (/gstack-qa etc.) are deployed from this repo's commands/ in step [5/6].
-# `retro` is intentionally excluded: Matt and gstack both define it.
+# NOTE: gstack installs skills flat (no namespace). The selected toolbox is qa,
+# qa-only, review, ship, cso, investigate, plan-ceo-review, design-review,
+# benchmark. Namespaced entry points (/gstack-qa etc.) are deployed from this
+# repo's commands/ in step [3/5]. `retro` is intentionally excluded: gstack
+# defines it and this repo does not wrap it.
 bash "$GSTACK/setup" --host opencode
 
-printf '[3/7] Checking local model file...\n'
+printf '[2/5] Checking local model file...\n'
 mkdir -p "$ROOT/.local"
 CREATED_MODELS=0
 if [[ ! -f "$ROOT/.local/models.sh" ]]; then
@@ -55,37 +47,62 @@ if [[ $CREATED_MODELS -eq 1 ]]; then
   exit 1
 fi
 
-printf '[4/7] Installing TEAM Ensemble configuration...\n'
-mkdir -p "$HOME/.config/opencode"
-sed "s|__OPENCODE_WORKER_MODEL__|${OPENCODE_WORKER_MODEL}|g" "$ROOT/profiles/team/ensemble.json.template" > "$HOME/.config/opencode/ensemble.json"
+printf '[3/5] Deploying shared agents and commands...\n'
+OC_CONFIG="$HOME/.config/opencode"
+mkdir -p "$OC_CONFIG/agents" "$OC_CONFIG/commands"
+cp "$ROOT"/agents/*.md "$OC_CONFIG/agents/"
+cp "$ROOT"/commands/*.md "$OC_CONFIG/commands/"
+for agent in stable-lead.md explorer.md implementer.md reviewer.md test-writer.md; do
+  [[ -f "$OC_CONFIG/agents/$agent" ]] || { echo "Agent was not deployed: $agent" >&2; exit 1; }
+done
+[[ -f "$OC_CONFIG/commands/stable.md" ]] || { echo 'Command was not deployed: stable.md' >&2; exit 1; }
+echo '  deployed stable-lead, DeepSeek workers (explorer/implementer/reviewer/test-writer), /stable, /gstack-* commands.'
+echo '  The profile resolves stable-lead from this global agents directory; run setup before launching oc-product.'
 
-printf '[5/7] Deploying shared agents and commands...\n'
-mkdir -p "$HOME/.config/opencode/agents" "$HOME/.config/opencode/commands"
-cp "$ROOT"/agents/*.md "$HOME/.config/opencode/agents/"
-cp "$ROOT"/commands/*.md "$HOME/.config/opencode/commands/"
-echo '  deployed stable-lead, team-lead, DeepSeek workers, /stable, /team, /gstack-* commands.'
-echo '  NOTE: repo reviewer.md (DeepSeek) deploys to global agents/; the TEAM profile keeps its own GPT reviewer.'
-
-printf '[6/7] Deploying portable global config and gstack routing...\n'
-if [[ ! -f "$HOME/.config/opencode/opencode.jsonc" ]]; then
-  cp "$ROOT/global/opencode.jsonc" "$HOME/.config/opencode/opencode.jsonc"
+printf '[4/5] Deploying portable global config and gstack routing...\n'
+GLOBAL_CONFIG="$OC_CONFIG/opencode.jsonc"
+if [[ ! -f "$GLOBAL_CONFIG" ]]; then
+  cp "$ROOT/global/opencode.jsonc" "$GLOBAL_CONFIG"
   echo '  installed global opencode.jsonc (was missing).'
 else
-  echo '  global opencode.jsonc exists; left untouched (diff against repo global/ if drifted).'
+  echo "warning: global opencode.jsonc exists; left untouched (file: $GLOBAL_CONFIG)." >&2
+  if grep -q 'opencode-ensemble' "$GLOBAL_CONFIG"; then
+    echo 'warning: it still references @hueyexe/opencode-ensemble. The multi-agent layer is retired; remove that plugin entry by hand.' >&2
+  fi
 fi
-if [[ ! -f "$HOME/.config/opencode/gstack.jsonc" ]]; then
-  cp "$ROOT/gstack/gstack.jsonc" "$HOME/.config/opencode/gstack.jsonc"
+if [[ ! -f "$OC_CONFIG/gstack.jsonc" ]]; then
+  cp "$ROOT/gstack/gstack.jsonc" "$OC_CONFIG/gstack.jsonc"
   echo '  installed gstack.jsonc (was missing).'
 else
   echo '  gstack.jsonc exists; left untouched (diff against repo gstack/ if drifted).'
 fi
 
-printf '[7/7] Launchers...\n'
+printf '[5/5] Launchers and legacy cleanup...\n'
 if [[ $INSTALL_LAUNCHERS -eq 1 ]]; then
   mkdir -p "$HOME/.local/bin"
   ln -sf "$ROOT/scripts/oc-product.sh" "$HOME/.local/bin/oc-product"
-  ln -sf "$ROOT/scripts/oc-team.sh" "$HOME/.local/bin/oc-team"
   echo 'Ensure ~/.local/bin is on PATH.'
 fi
 
-echo 'Restore complete. PRODUCT Superpowers installs from its plugin declaration on first launch.'
+LEGACY=(
+  "$OC_CONFIG/agents/team-lead.md"
+  "$OC_CONFIG/agents/team-scout.md"
+  "$OC_CONFIG/agents/team-builder.md"
+  "$OC_CONFIG/agents/team-reviewer.md"
+  "$OC_CONFIG/commands/team.md"
+  "$OC_CONFIG/ensemble.json"
+  "$OC_CONFIG/profiles/team.json"
+  "$OC_CONFIG/profiles/team"
+)
+PRESENT=()
+for item in "${LEGACY[@]}"; do [[ -e "$item" ]] && PRESENT+=("$item"); done
+if [[ ${#PRESENT[@]} -eq 0 ]]; then
+  echo '  no retired multi-agent artifacts found.'
+elif [[ $CLEAN_LEGACY -eq 1 ]]; then
+  for item in "${PRESENT[@]}"; do rm -rf "$item"; echo "  removed retired artifact: $item"; done
+else
+  echo 'warning: retired multi-agent artifacts still present. Re-run with --clean-legacy to remove them:' >&2
+  for item in "${PRESENT[@]}"; do echo "    $item"; done
+fi
+
+echo 'Restore complete. Superpowers installs from the profile plugin declaration on first launch.'
