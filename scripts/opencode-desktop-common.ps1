@@ -18,7 +18,10 @@ function Fail-DesktopLaunch([string]$Message) {
       [System.Windows.Forms.MessageBoxButtons]::OK,
       [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
   } catch {
-    Write-Error $Message
+    # Do not use Write-Error here: under $ErrorActionPreference='Stop' it throws
+    # from inside the catch and bypasses the clean exit below.
+    Write-DesktopLog "Message box unavailable: $($_.Exception.Message)"
+    [Console]::Error.WriteLine($Message)
   }
   exit 1
 }

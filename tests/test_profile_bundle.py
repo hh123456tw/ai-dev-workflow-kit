@@ -187,6 +187,37 @@ class ThreeModeBundleTest(unittest.TestCase):
         for launcher in ("oc-vanilla", "oc-stable", "oc-core"):
             self.assertIn(launcher, win)
 
+        # The shim and *.ps1 backups must actually copy. A wildcard passed to
+        # -LiteralPath copies nothing, and -ErrorAction SilentlyContinue hides it.
+        modes_backup = re.search(
+            r"(?s)\$modesSource = Join-Path \$OcConfig 'modes'.*?(?=\$coreSource)",
+            win,
+        )
+        assert modes_backup is not None
+        modes_backup_text = modes_backup.group(0)
+        self.assertIn(
+            "Get-ChildItem -Path (Join-Path $modesSource '*.ps1')",
+            modes_backup_text,
+        )
+        self.assertIn("Copy-Item -LiteralPath $modeScript.FullName", modes_backup_text)
+        self.assertNotRegex(modes_backup_text, re.compile(r"Copy-Item -LiteralPath[^\n]*\*"))
+        self.assertNotIn("SilentlyContinue", modes_backup_text)
+
+        shim_backup = re.search(
+            r"(?s)# CLI shims and the two mode shortcuts this repository owns\..*?"
+            r"\nforeach \(\$desktop",
+            win,
+        )
+        assert shim_backup is not None
+        shim_backup_text = shim_backup.group(0)
+        self.assertIn(
+            "Get-ChildItem -Path (Join-Path $binSource 'oc-*.cmd')",
+            shim_backup_text,
+        )
+        self.assertIn("Copy-Item -LiteralPath $shim.FullName", shim_backup_text)
+        self.assertNotRegex(shim_backup_text, re.compile(r"Copy-Item -LiteralPath[^\n]*\*"))
+        self.assertNotIn("SilentlyContinue", shim_backup_text)
+
         # The stock OpenCode shortcut must be absent from the deletion list, not
         # merely absent from a reassuring print.
         self.assertNotIn("OpenCode.lnk", win)
@@ -207,6 +238,15 @@ class ThreeModeBundleTest(unittest.TestCase):
         )
         self.assertNotRegex(win, re.compile(r"(?i)fall\s?back"))
         self.assertRegex(unix, re.compile(r"\$VERSION.*\$REQUIRED_SUPERPOWERS_VERSION"))
+        # The mismatch branch must actually fail: removing the || { ...; exit 1; }
+        # arm would otherwise still satisfy the comparison-regex check above.
+        self.assertRegex(
+            unix,
+            re.compile(
+                r'\|\| \{ echo "Superpowers \$VERSION found but '
+                r'\$REQUIRED_SUPERPOWERS_VERSION is required[^"]*" >&2; exit 1; \}'
+            ),
+        )
         self.assertNotRegex(unix, re.compile(r"(?i)fall\s?back"))
 
     def test_core_manifest_records_pinned_version_and_six_skills(self) -> None:

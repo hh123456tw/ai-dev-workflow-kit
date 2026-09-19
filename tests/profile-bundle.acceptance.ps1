@@ -152,8 +152,23 @@ Assert-True ($setupWin -match 'oc-core') 'Windows setup must install the Core CL
 # and no default agent.
 Assert-True ($setupWin -match 'global\\opencode.jsonc') 'Windows setup must install the portable global config when missing'
 Assert-True ($setupUnix -match 'global/opencode.jsonc') 'Unix setup must install the portable global config when missing'
-# The backup must cover the launchers and the shortcuts this repo owns.
-Assert-True ($setupWin -match "oc-\*\.cmd") 'Windows setup must back up the CLI shims'
+# The backup must cover the launchers and the shortcuts this repo owns. Matching
+# the bare string "oc-*.cmd" is not evidence: the old code passed the wildcard to
+# -LiteralPath and swallowed the resulting failure, so nothing was copied. Read the
+# actual backup blocks and require wildcard-expanding copies that surface errors.
+$modesBackupBlock = [regex]::Match($setupWin, '(?s)\$modesSource = Join-Path \$OcConfig ''modes''.*?(?=\$coreSource)').Value
+Assert-True ($modesBackupBlock.Length -gt 0) 'Windows setup must back up the mode launcher scripts'
+Assert-True ($modesBackupBlock -match 'Get-ChildItem -Path \(Join-Path \$modesSource ''\*\.ps1''\)') 'Windows setup must enumerate the mode *.ps1 scripts for backup'
+Assert-True ($modesBackupBlock -match 'Copy-Item -LiteralPath \$modeScript\.FullName') 'Windows setup must copy each enumerated mode *.ps1 script'
+Assert-True ($modesBackupBlock -notmatch 'Copy-Item -LiteralPath[^\r\n]*\*') 'Windows setup must not pass a wildcard to -LiteralPath for the *.ps1 backup'
+Assert-True ($modesBackupBlock -notmatch 'SilentlyContinue') 'Windows setup must not swallow mode *.ps1 backup failures'
+
+$shimBackupBlock = [regex]::Match($setupWin, '(?s)# CLI shims and the two mode shortcuts this repository owns\..*?(?=\r?\nforeach \(\$desktop)').Value
+Assert-True ($shimBackupBlock.Length -gt 0) 'Windows setup must back up the CLI shims'
+Assert-True ($shimBackupBlock -match 'Get-ChildItem -Path \(Join-Path \$binSource ''oc-\*\.cmd''\)') 'Windows setup must enumerate the oc-*.cmd shims for backup'
+Assert-True ($shimBackupBlock -match 'Copy-Item -LiteralPath \$shim\.FullName') 'Windows setup must copy each enumerated oc-*.cmd shim'
+Assert-True ($shimBackupBlock -notmatch 'Copy-Item -LiteralPath[^\r\n]*\*') 'Windows setup must not pass a wildcard to -LiteralPath for the shim backup'
+Assert-True ($shimBackupBlock -notmatch 'SilentlyContinue') 'Windows setup must not swallow shim backup failures'
 Assert-True ($setupWin -match 'OpenCode Vanilla') 'Windows setup must reference the managed shortcuts for backup and cleanup'
 # Real safety check: the stock OpenCode shortcut must be absent from the deletion
 # list. The Write-Host string above is not evidence; this reads the list itself.

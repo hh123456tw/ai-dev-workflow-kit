@@ -29,9 +29,15 @@ function Get-SuperpowersPackage {
   foreach ($candidate in $candidates) {
     $version = (Get-Content (Join-Path $candidate.FullName 'package.json') -Raw | ConvertFrom-Json).version
     if ($version -eq $RequiredSuperpowersVersion) { return $candidate.FullName }
-    if ($null -eq $bestVersion -or [version]$version -gt [version]$bestVersion) {
+    # Keep the first candidate so the version check below reports the real string.
+    # A pre-release or malformed version must not throw an unhandled cast error
+    # before the deliberate mismatch message runs.
+    if ($null -eq $best) { $best = $candidate.FullName }
+    $parsed = $null
+    if (-not [version]::TryParse([string]$version, [ref]$parsed)) { continue }
+    if ($null -eq $bestVersion -or $parsed -gt $bestVersion) {
       $best = $candidate.FullName
-      $bestVersion = $version
+      $bestVersion = $parsed
     }
   }
   # No pinned match: return the newest so the version check can report it clearly.
@@ -76,7 +82,11 @@ $modesSource = Join-Path $OcConfig 'modes'
 if (Test-Path -LiteralPath $modesSource) {
   $modesTarget = Join-Path $Backup 'modes'
   New-Item -ItemType Directory -Force -Path $modesTarget | Out-Null
-  Copy-Item -LiteralPath (Join-Path $modesSource '*.ps1') $modesTarget -Force -ErrorAction SilentlyContinue
+  # Enumerate the wildcard instead of passing it to -LiteralPath (which disables
+  # expansion and copies nothing) and let a genuine copy failure surface.
+  foreach ($modeScript in Get-ChildItem -Path (Join-Path $modesSource '*.ps1') -File) {
+    Copy-Item -LiteralPath $modeScript.FullName -Destination $modesTarget -Force
+  }
   foreach ($mode in @('vanilla', 'stable')) {
     $source = Join-Path $modesSource $mode
     if (Test-Path -LiteralPath $source) { Copy-Item -LiteralPath $source -Destination (Join-Path $modesTarget $mode) -Recurse -Force }
@@ -96,7 +106,11 @@ $binSource = Join-Path $env:USERPROFILE 'bin'
 if (Test-Path -LiteralPath $binSource) {
   $binTarget = Join-Path $Backup 'bin'
   New-Item -ItemType Directory -Force -Path $binTarget | Out-Null
-  Copy-Item -LiteralPath (Join-Path $binSource 'oc-*.cmd') $binTarget -Force -ErrorAction SilentlyContinue
+  # Enumerate the wildcard instead of passing it to -LiteralPath (which disables
+  # expansion and copies nothing) and let a genuine copy failure surface.
+  foreach ($shim in Get-ChildItem -Path (Join-Path $binSource 'oc-*.cmd') -File) {
+    Copy-Item -LiteralPath $shim.FullName -Destination $binTarget -Force
+  }
 }
 foreach ($desktop in @((Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'), [Environment]::GetFolderPath('Desktop'))) {
   foreach ($label in @('OpenCode Vanilla', 'OpenCode Core')) {

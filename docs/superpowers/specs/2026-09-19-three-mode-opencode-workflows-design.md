@@ -258,12 +258,6 @@ Nothing is committed/pushed as complete until every gate is green.
 
 ### 10.4 Desktop smoke
 
-- Keep the existing Stable Desktop instance open.
-- Launch Vanilla and Core through their shortcuts.
-- Verify three main OpenCode processes coexist with distinct user-data directories.
-- Verify the Core sidecar resolves `core-lead` and no full Superpowers plugin/bootstrap.
-- Close only the test-launched Vanilla/Core instances after verification.
-
 **Revised after the §8.2.1 finding.** The coexistence check is not achievable on
 OpenCode Desktop 1.18.31. The gate becomes:
 
