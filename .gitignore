@@ -13,6 +13,9 @@ credentials/
 .local/*
 !.local/README.md
 
+# Core mode skills are deployed from the installed Superpowers package, never vendored
+modes/core/skills/
+
 # Runtime / caches
 node_modules/
 .cache/

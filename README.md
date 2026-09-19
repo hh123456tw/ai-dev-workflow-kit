@@ -1,78 +1,94 @@
-# OpenCode 單一工作流工具組
+# OpenCode 三模式工作流工具組
 
-可攜的 OpenCode 設定，提供**一套**開發流程。本 repository 只保存設定與還原腳本；憑證、OAuth 狀態、快取及第三方框架原始碼都留在本機。新電腦 clone 之後跑一次 setup 腳本，即可還原到與主力機相同的配置（剩下只需 `opencode auth login`）。
+可攜的 OpenCode 設定，提供**三套互相隔離**的開發模式。本 repository 只保存設定與還原腳本；憑證、OAuth 狀態、快取及第三方框架原始碼都留在本機。新電腦 clone 之後跑一次 setup 腳本，即可還原到與主力機相同的配置（剩下只需 `opencode auth login`）。
 
-## 為什麼只有一套
+## 三種模式
 
-先前版本提供 STABLE 與 TEAM 兩套流程，TEAM 另外搭載 OpenCode Ensemble 多 agent 執行層。實測後移除，原因是結構性的，不是調參可以解決：
+| 模式 | 用途 | 預設 agent | Superpowers |
+|---|---|---|---|
+| **Vanilla** | 完整 upstream Superpowers，作為 reference 與最大嚴謹度 fallback | `build`（OpenCode 內建） | 完整 plugin／bootstrap |
+| **Stable** | 安全日常模式，現有 cost-control／one-writer／bounded delegation／reviewer 規則 | `stable-lead` | 完整 plugin／bootstrap |
+| **Core** | Hackathon／MVP 快速自主模式 | `core-lead` | 只有 6 個精選 skills，**不載入 bootstrap** |
 
-- Ensemble 每次呼叫都把 team state 注入 lead 的 system prompt。Prompt cache 依賴位元穩定的前綴，因此只要有任何 teammate 狀態變動，前綴就失效，lead 的 cache 幾乎完全吃不到。
-- 每個 teammate 都是獨立 session，各自冷啟動。N 個 agent 等於 N 份無法共用的前綴，以及 N 次重讀同一個 repo。
+### Core 的 6 個 skills
 
-結果就是更慢、更貴、更不穩。兩套流程同時也讓維護面加倍：兩份 lead 定義、兩套方法論、兩組 agent、兩個啟動入口、兩套測試，而日常工作其實只有一件事。
+1. `test-driven-development`
+2. `systematic-debugging`
+3. `verification-before-completion`
+4. `requesting-code-review`
+5. `receiving-code-review`
+6. `finishing-a-development-branch`
 
-完整理由與設計見 [`docs/superpowers/specs/2026-09-18-single-workflow-design.md`](docs/superpowers/specs/2026-09-18-single-workflow-design.md)。
+Core 刻意**不暴露**：`brainstorming`、`writing-plans`、`subagent-driven-development`、`using-git-worktrees`。
 
-## 單一工作流
+## 為什麼是三種
 
-```mermaid
-flowchart TD
-  U[使用者] --> L[stable-lead]
-  L --> S[界定最小可 demo 成果與驗收]
-  S --> B[Superpowers：brainstorm → plan → TDD]
-  B --> D{這個切片值得委派嗎}
-  D -->|不| L
-  D -->|是| W[一位 DeepSeek worker：有界實作]
-  W --> R[獨立唯讀 review]
-  L --> R
-  R --> V[lead 終審驗證]
-  V --> M[整合]
-  M --> G[gstack：review → qa → ship]
+實測 3 個任務（從零建立 CLI、既有專案加功能、regression bugfix），每個 valid run 都通過 public 與 agent 看不到的 hidden tests：
+
+| 工作流 | Runs | Pass | 平均時間 | Session 拓撲 | 平均 DeepSeek 成本 |
+|---|---:|---:|---:|---:|---:|
+| Vanilla | 3 | 3/3 | 18m 26s | 2–17（不固定） | $0.0988 |
+| Stable | 9 | 9/9 | 9m 52s | 固定 2 | $0.0170 |
+| Core | 9 | 9/9 | 6m 5s | 固定 2 | $0.0163 |
+
+Core 相對 Stable：快 38.3%、input token 少 37.7%、output token 少 47.6%，hidden test 通過率相同。
+
+Vanilla 功能正確但拓撲不固定（2 到 17 個 session），時間與成本變異大，不適合時間有限的單人 MVP。
+
+完整理由見 [`docs/superpowers/specs/2026-09-19-three-mode-opencode-workflows-design.md`](docs/superpowers/specs/2026-09-19-three-mode-opencode-workflows-design.md)。
+
+## 為什麼必須隔離
+
+三種模式不能靠切換 agent 實作，因為 **plugin 載入發生在 process／config 層級**：
+
+- Vanilla 與 Stable 需要完整 Superpowers plugin 與 bootstrap。
+- Core 必須完全看不到 bootstrap 與重型 skills。
+
+因此 Core 使用獨立的 config dir、獨立的 `XDG_CONFIG_HOME`、`--pure`，並停用外部 skills 與預設 plugins。這已用 `opencode debug config` 與 `opencode debug skill` 驗證：Core 只看到 6 個 skills，plugin 為 none。
+
+## 入口
+
+### CLI
+
+```powershell
+oc-vanilla    # 完整 Superpowers，build agent
+oc-stable     # 完整 Superpowers，stable-lead
+oc-core       # 自主 Core，--pure，隔離 config
 ```
 
-**一條規則，自動縮放。** 使用者不選模式；lead 讀取範圍與你提供的 deadline，自己決定要多重的流程。同一個時間只有一位寫入者。
+### OpenCode Desktop
 
-| | 內容 |
-|---|---|
-| 入口 | 直接開 OpenCode（原始捷徑）。`default_agent` 已設為 `stable-lead`，session 一開始就是 lead；也可隨時打 `/stable <需求>` |
-| Lead | `stable-lead`，模型由全域 config 決定 |
-| 方法論 | Superpowers（brainstorm → plan → TDD → review → 驗證），由全域 plugin 載入 |
-| Worker | 需要時一位 DeepSeek V4.1 Flash，條件見下 |
-| 執行層 | 循序；不使用任何多 agent orchestration |
-| 核心取捨 | 每個成功切片的成本，不是每百萬 token 的價格 |
-
-## 怎麼開
-
-**就用原始捷徑開 OpenCode。** 不需要切 profile、不需要額外的 launcher、不需要設定環境變數。全域 config 已載入 Superpowers plugin，`stable-lead` 與四個 DeepSeek worker 由 setup 部署到全域 agents 目錄。
-
-早期版本有一個 `oc-product` wrapper 與 `profiles/product` 設定，用來把模型選擇外部化到 `.local/models.*`。那組已經移除：模型直接寫在全域 config，而 `oc-product` 正是舊流程殘留的來源。OpenCode 本身也不支援 `profiles/` 這個概念（套件內沒有任何相關程式碼）。
-
-## 委派條件
-
-Lead 預設自己做。只有四項全部成立才委派一位有界 worker：
-
-1. 切片有明確且互斥的檔案所有權；
-2. 不與其他進行中的工作共用 route、shared state、schema、套件／部署設定、可變 test fixture；
-3. 有獨立的驗收檢查；
-4. 可以獨立回滾。
-
-任何一項不成立，lead 自己做完。委派不是為了製造平行度的錯覺。
-
-## Deadline 自動分段
-
-當你提供 deadline 或剩餘時間，lead 會套用對應階段；沒有提供時一律用 Build 紀律，並且會明說。
-
-| 階段 | 剩餘時間 | 允許的工作 |
+| 捷徑 | 模式 | user-data-dir |
 |---|---|---|
-| Build | 6 小時以上 | 正常建立 spine 與高價值功能 |
-| Feature Freeze | 2–6 小時 | 完成已接受的工作、整合、驗證；拒絕擴大範圍 |
-| Demo Survival | 2 小時以下 | 只做 demo blocker、crash、壞掉的 UX、seed／mock fallback、展示路徑 |
+| 原本的 **OpenCode** | Stable | `%APPDATA%\ai.opencode.desktop` |
+| **OpenCode Vanilla** | Vanilla | `%APPDATA%\ai.opencode.desktop-vanilla` |
+| **OpenCode Core** | Core | `%APPDATA%\ai.opencode.desktop-core` |
 
-Demo Survival 期間禁止 refactor、升級依賴、架構清理、schema migration，除非那正是 demo 路徑的直接阻塞。
+**重要限制（已實測）：OpenCode Desktop 1.18.31 一次只能開一個實例。** 實測結果是：在既有實例執行中，用不同的 `--user-data-dir` 啟動 `OpenCode.exe` 會立即以 exit 0 結束，自訂目錄完全沒有被寫入，預設的 `lockfile` 也沒有變動。已用三個不同目錄與兩種參數形式重現。
 
-## 進度以產物為準
+原因是 app 呼叫 `requestSingleInstanceLock()` 後失敗就退出，而這個版本的 lock **不以 `--user-data-dir` 區分**。
 
-不對任何 agent 設定「每 N 分鐘回報」的要求 —— agent 不會可靠計時，這種指令只會產生假進度。委派切片完成的唯一標準是 handback 內含：變更檔案、實際執行過的指令與結果、驗收結果、剩餘限制。沒有證據的 handback 一律退回，未完成的工作不會被當成完成，也不會進入主要路徑。
+所以：
+
+- 三個 Desktop 捷徑是**替代入口，不是可同時開啟的視窗**。要換模式就關掉目前這個再開另一個。
+- **CLI 的三個 launcher 不受影響**，它們是獨立 process，可以同時執行。
+- Core 的 config 隔離在 Desktop wrapper 下仍然有效，只有「並存」不可用。
+
+**原本的 OpenCode 捷徑不會被修改。**
+
+### Slash command
+
+`/stable` 仍可用於任何模式。
+
+## Core 的行為
+
+- 規格清楚就直接開始實作，不開設計批准迴圈。
+- 可逆的歧義自己選最簡單的合理解釋、記錄下來、繼續做。
+- 只有這幾種情況會停下來問：不可逆／破壞性操作、安全或憑證決策、破壞性資料或 schema migration、缺少只有你能提供的存取權。
+- 預設自己實作；只有四條件全部成立才委派一位 DeepSeek worker（互斥檔案所有權、不共用 state／schema／config、獨立驗收、可獨立回滾）。
+- 同一時間只有一位寫入者。
+- 非平凡的多檔改動完成後，派一位唯讀 reviewer。
+- tests／typecheck／lint／build／smoke 永遠是權威。
 
 ## Windows 安裝
 
@@ -85,9 +101,18 @@ Set-ExecutionPolicy -Scope Process Bypass
 ./scripts/setup-windows.ps1
 ```
 
-setup 會依序：裝 gstack → 部署全域 agents／commands（`stable-lead`、四個 DeepSeek worker、`/stable`、`/gstack-*`）→ 補全域 config 與 gstack 路由（缺失才裝）→ 清掉 3 份以前的舊備份。若 `~/.config/opencode/opencode.jsonc` 已存在，setup 只會印出警告並保留原檔，不會改寫你的全域設定。
+setup 會依序：
 
-完成本機 provider 認證後直接開 OpenCode 即可。若機器上還留著舊版的 `oc-product`、`profiles/product*`、`team-*`、`ensemble.*`，加上 `-CleanLegacy` 可一次清掉。
+1. 備份全域 config、agents、commands、modes（保留最新 3 份備份）。
+2. 安裝／更新 gstack。
+3. 部署共用全域 agents 與 commands。
+4. 部署三個 mode 目錄與 launchers。
+5. 從已安裝的 Superpowers 套件複製 6 個 Core skills（**要求 6.3.0**，版本不符會明確失敗，不靜默降級）。
+6. 安裝 `oc-vanilla`／`oc-stable`／`oc-core`，建立兩個 Desktop 捷徑，並列出待清理的舊產物。
+
+`~/.config/opencode/opencode.jsonc` 已存在時，setup 只會警告並保留原檔。
+
+舊產物（`team-*`、`profiles/`、`ensemble.*`、`oc-product`）加 `-CleanLegacy` 一次清除。
 
 ## macOS/Linux 安裝
 
@@ -98,13 +123,20 @@ chmod +x scripts/*.sh
 ./scripts/setup-unix.sh
 ```
 
-流程同 Windows，舊產物清理用 `--clean-legacy`。注意：unix 腳本尚未在 bash 環境完整實測過，回報問題請附 log。
+Unix 只提供三個 CLI launcher，不建立 Desktop 捷徑（Desktop 捷徑是 Windows-only）。舊產物清理用 `--clean-legacy`。
 
-## 學習與還原
+## 驗證
 
-學到的教訓由 lead 在收尾時提煉，經使用者批准後寫入當專案的 AGENTS.md（兩次才入選、40 行預算、流水帳另存 `docs/learnings/`）。
+```powershell
+pwsh -NoProfile -File tests/profile-bundle.acceptance.ps1
+python -m pytest tests/test_profile_bundle.py -q
+```
 
-還原步驟見 [`docs/restore-checklist.md`](docs/restore-checklist.md)。
+## 後續研究
+
+Core 的下一階段候選是 **Risk-Routed Hybrid Core**：用便宜的 decision layer 在 GPT-5.6 被呼叫之前決定 execution tier，讓 GPT-5.6 只處理真正困難、高風險的工作。目前僅完成研究，尚未實作。
+
+見 [`docs/research/2026-09-19-jev-risk-routed-hybrid-core.md`](docs/research/2026-09-19-jev-risk-routed-hybrid-core.md)。
 
 ## 安全性
 
@@ -115,5 +147,3 @@ chmod +x scripts/*.sh
 - [OpenCode](https://opencode.ai/)
 - [Superpowers](https://github.com/obra/superpowers)
 - [gstack](https://github.com/garrytan/gstack)
-
-設計原文：[`docs/superpowers/specs/2026-09-18-single-workflow-design.md`](docs/superpowers/specs/2026-09-18-single-workflow-design.md)

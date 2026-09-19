@@ -6,18 +6,67 @@ function Require-Command($name) {
   if (-not (Get-Command $name -ErrorAction SilentlyContinue)) { throw "Required command not found: $name" }
 }
 
+$CoreSkills = @(
+  'test-driven-development',
+  'systematic-debugging',
+  'verification-before-completion',
+  'requesting-code-review',
+  'receiving-code-review',
+  'finishing-a-development-branch'
+)
+$RequiredSuperpowersVersion = '6.3.0'
+
+function Get-SuperpowersPackage {
+  $root = Join-Path $env:USERPROFILE '.cache\opencode\packages'
+  if (-not (Test-Path -LiteralPath $root)) { return $null }
+  # The cache nests by source path, for example
+  # packages/superpowers@git+https_/github.com/obra/superpowers.git/node_modules/superpowers
+  $found = Get-ChildItem -LiteralPath $root -Directory -Recurse -Depth 6 -Filter 'superpowers' -ErrorAction SilentlyContinue |
+    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'package.json') } |
+    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'skills') } |
+    Select-Object -First 1
+  if ($found) { return $found.FullName }
+  return $null
+}
+
+function Get-WorkingBash {
+  $candidates = @(
+    (Join-Path $env:PROGRAMFILES 'Git\bin\bash.exe'),
+    (Join-Path ${env:ProgramFiles(x86)} 'Git\bin\bash.exe'),
+    (Join-Path $env:LOCALAPPDATA 'Programs\Git\bin\bash.exe')
+  )
+  $command = Get-Command bash -ErrorAction SilentlyContinue
+  if ($command) { $candidates += $command.Source }
+  foreach ($candidate in $candidates) {
+    if (-not (Test-Path -LiteralPath $candidate)) { continue }
+    try {
+      $probe = & $candidate -c 'echo BASH_OK' 2>$null
+      if ($probe -match 'BASH_OK') { return $candidate }
+    } catch { }
+  }
+  return $null
+}
+
 Require-Command git
 Require-Command opencode
 
-Write-Host '[0/3] Pruning old backups (keep newest 3)...'
-$BackupRoot = Join-Path $env:USERPROFILE '.config\opencode'
-$OldBackups = Get-ChildItem -Path $BackupRoot -Directory -Filter 'backup_*' -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -Skip 3
-foreach ($old in $OldBackups) {
-  Remove-Item -LiteralPath $old.FullName -Recurse -Force
-  Write-Host "  pruned old backup: $($old.Name)"
-}
+$OcConfig = Join-Path $env:USERPROFILE '.config\opencode'
+$ModesDir = Join-Path $OcConfig 'modes'
 
-Write-Host '[1/3] Installing/updating gstack for OpenCode...'
+Write-Host '[0/6] Backing up managed configuration...'
+$Stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$Backup = Join-Path $OcConfig "backup_$Stamp"
+New-Item -ItemType Directory -Force -Path $Backup | Out-Null
+foreach ($item in @('opencode.jsonc', 'agents', 'commands', 'modes')) {
+  $source = Join-Path $OcConfig $item
+  if (Test-Path -LiteralPath $source) { Copy-Item -LiteralPath $source -Destination (Join-Path $Backup $item) -Recurse -Force }
+}
+Get-ChildItem -Path $OcConfig -Directory -Filter 'backup_*' | Sort-Object Name -Descending | Select-Object -Skip 3 | ForEach-Object {
+  Remove-Item -LiteralPath $_.FullName -Recurse -Force
+}
+Write-Host "  backup written to $Backup"
+
+Write-Host '[1/6] Installing/updating gstack for OpenCode...'
 $GstackHome = Join-Path $env:USERPROFILE '.local\share\gstack'
 if (Test-Path (Join-Path $GstackHome '.git')) {
   git -C $GstackHome pull --ff-only | Out-Host
@@ -25,55 +74,103 @@ if (Test-Path (Join-Path $GstackHome '.git')) {
   New-Item -ItemType Directory -Force -Path (Split-Path -Parent $GstackHome) | Out-Null
   git clone https://github.com/garrytan/gstack.git $GstackHome | Out-Host
 }
-# NOTE: gstack installs skills flat (no namespace). The selected toolbox is qa,
-# qa-only, review, ship, cso, investigate, plan-ceo-review, design-review,
-# benchmark. Namespaced entry points (/gstack-qa etc.) are deployed from this
-# repo's commands/ in step [2/3]. `retro` is intentionally excluded: gstack
-# defines it and this repo does not wrap it.
-$bash = Get-Command bash -ErrorAction SilentlyContinue
+$bash = Get-WorkingBash
 if ($bash) {
-  & $bash.Source (Join-Path $GstackHome 'setup') --host opencode
+  & $bash (Join-Path $GstackHome 'setup') --host opencode
 } else {
-  Write-Warning 'bash not found. gstack clone is ready, but setup was skipped. Install Git Bash/WSL and run: bash ~/.local/share/gstack/setup --host opencode'
+  Write-Warning 'No working bash found. The gstack clone is ready, but setup was skipped. Install Git Bash or WSL and run: bash ~/.local/share/gstack/setup --host opencode'
 }
 
-Write-Host '[2/3] Deploying shared agents and commands...'
-$OcConfig = Join-Path $env:USERPROFILE '.config\opencode'
+Write-Host '[2/6] Deploying shared global agents and commands...'
 $AgentsDir = Join-Path $OcConfig 'agents'
 $CommandsDir = Join-Path $OcConfig 'commands'
 New-Item -ItemType Directory -Force -Path $AgentsDir | Out-Null
 New-Item -ItemType Directory -Force -Path $CommandsDir | Out-Null
 Copy-Item (Join-Path $RepoRoot 'agents\*.md') $AgentsDir -Force
 Copy-Item (Join-Path $RepoRoot 'commands\*.md') $CommandsDir -Force
-$RequiredAgents = @('stable-lead.md', 'explorer.md', 'implementer.md', 'reviewer.md', 'test-writer.md')
-foreach ($agent in $RequiredAgents) {
+foreach ($agent in @('stable-lead.md', 'explorer.md', 'implementer.md', 'reviewer.md', 'test-writer.md')) {
   if (-not (Test-Path (Join-Path $AgentsDir $agent))) { throw "Agent was not deployed: $agent" }
 }
 if (-not (Test-Path (Join-Path $CommandsDir 'stable.md'))) { throw 'Command was not deployed: stable.md' }
-Write-Host '  deployed stable-lead, DeepSeek workers (explorer/implementer/reviewer/test-writer), /stable, /gstack-* commands.'
+Write-Host '  deployed stable-lead, DeepSeek workers, /stable, /gstack-* commands.'
 
-Write-Host '[3/3] Deploying portable global config and cleaning up retired artifacts...'
-$GlobalConfig = Join-Path $OcConfig 'opencode.jsonc'
-if (-not (Test-Path $GlobalConfig)) {
-  Copy-Item (Join-Path $RepoRoot 'global\opencode.jsonc') $GlobalConfig
-  Write-Host '  installed global opencode.jsonc (was missing).'
-} else {
-  $raw = Get-Content -Raw -LiteralPath $GlobalConfig
-  Write-Warning "  global opencode.jsonc exists; left untouched (file: $GlobalConfig)."
-  if ($raw -match 'opencode-ensemble') {
-    Write-Warning '  It still references @hueyexe/opencode-ensemble. The multi-agent layer is retired; remove that plugin entry by hand.'
-  }
-  if ($raw -notmatch '"default_agent"') {
-    Write-Warning '  It sets no default_agent. Add "default_agent": "stable-lead" to start sessions as the lead.'
+Write-Host '[3/6] Deploying the three isolated mode directories...'
+New-Item -ItemType Directory -Force -Path $ModesDir | Out-Null
+foreach ($mode in @('vanilla', 'stable')) {
+  $target = Join-Path $ModesDir $mode
+  New-Item -ItemType Directory -Force -Path $target | Out-Null
+  Copy-Item (Join-Path $RepoRoot "modes\$mode\opencode.jsonc") (Join-Path $target 'opencode.jsonc') -Force
+}
+$CoreDir = Join-Path $ModesDir 'core'
+New-Item -ItemType Directory -Force -Path (Join-Path $CoreDir 'agents') | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $CoreDir 'xdg') | Out-Null
+Copy-Item (Join-Path $RepoRoot 'modes\core\opencode.jsonc') (Join-Path $CoreDir 'opencode.jsonc') -Force
+Copy-Item (Join-Path $RepoRoot 'modes\core\agents\core-lead.md') (Join-Path $CoreDir 'agents') -Force
+foreach ($worker in @('explorer.md', 'implementer.md', 'reviewer.md', 'test-writer.md')) {
+  Copy-Item (Join-Path $RepoRoot "agents\$worker") (Join-Path $CoreDir 'agents') -Force
+}
+foreach ($script in @('opencode-desktop-common.ps1', 'desktop-vanilla.ps1', 'desktop-core.ps1', 'oc-vanilla.ps1', 'oc-stable.ps1', 'oc-core.ps1')) {
+  Copy-Item (Join-Path $RepoRoot "scripts\$script") (Join-Path $ModesDir $script) -Force
+}
+Write-Host "  deployed vanilla, stable, core, and mode launchers under $ModesDir."
+
+Write-Host '[4/6] Deploying Core skills from the installed Superpowers package...'
+$superpowers = Get-SuperpowersPackage
+if (-not $superpowers) {
+  throw 'Superpowers package not found under ~/.cache/opencode/packages. Launch OpenCode once in Stable so the plugin installs, then re-run setup.'
+}
+$version = (Get-Content (Join-Path $superpowers 'package.json') -Raw | ConvertFrom-Json).version
+if ($version -ne $RequiredSuperpowersVersion) {
+  throw "Superpowers $version found but $RequiredSuperpowersVersion is required. Update the repository pin and the Core skill list deliberately before continuing."
+}
+$CoreSkillsDir = Join-Path $CoreDir 'skills'
+if (Test-Path -LiteralPath $CoreSkillsDir) { Remove-Item -LiteralPath $CoreSkillsDir -Recurse -Force }
+New-Item -ItemType Directory -Force -Path $CoreSkillsDir | Out-Null
+foreach ($skill in $CoreSkills) {
+  $source = Join-Path $superpowers "skills\$skill"
+  if (-not (Test-Path -LiteralPath $source)) { throw "Core skill missing from Superpowers package: $skill" }
+  Copy-Item -LiteralPath $source -Destination (Join-Path $CoreSkillsDir $skill) -Recurse -Force
+}
+[ordered]@{
+  superpowers_version = $version
+  skills = $CoreSkills
+  deployed_at = (Get-Date).ToString('o')
+} | ConvertTo-Json -Depth 4 | Set-Content -Path (Join-Path $CoreSkillsDir 'manifest.json') -Encoding UTF8
+Write-Host "  deployed $($CoreSkills.Count) Core skills from Superpowers $version."
+
+Write-Host '[5/6] Installing CLI launchers...'
+$Bin = Join-Path $env:USERPROFILE 'bin'
+New-Item -ItemType Directory -Force -Path $Bin | Out-Null
+foreach ($mode in @('vanilla', 'stable', 'core')) {
+  $content = "@echo off`r`npowershell -NoProfile -ExecutionPolicy Bypass -File `"$ModesDir\oc-$mode.ps1`" %*`r`n"
+  Set-Content -Path (Join-Path $Bin "oc-$mode.cmd") -Value $content -Encoding ASCII
+}
+$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+if (($userPath -split ';') -notcontains $Bin) {
+  [Environment]::SetEnvironmentVariable('Path', (($userPath.TrimEnd(';') + ';' + $Bin).Trim(';')), 'User')
+  Write-Warning "Added $Bin to user PATH. Open a new terminal before using oc-vanilla, oc-stable, or oc-core."
+}
+Write-Host '  installed oc-vanilla, oc-stable, oc-core.'
+
+Write-Host '[6/6] Creating Desktop shortcuts and cleaning up retired artifacts...'
+$shell = New-Object -ComObject WScript.Shell
+$created = @()
+foreach ($desktop in @((Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'), [Environment]::GetFolderPath('Desktop'))) {
+  if (-not (Test-Path -LiteralPath $desktop)) { continue }
+  foreach ($mode in @('vanilla', 'core')) {
+    $label = if ($mode -eq 'vanilla') { 'OpenCode Vanilla' } else { 'OpenCode Core' }
+    $path = Join-Path $desktop "$label.lnk"
+    $shortcut = $shell.CreateShortcut($path)
+    $shortcut.TargetPath = 'powershell.exe'
+    $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ModesDir\desktop-$mode.ps1`""
+    $shortcut.WorkingDirectory = $env:USERPROFILE
+    $shortcut.Description = "OpenCode Desktop in $mode mode"
+    $shortcut.Save()
+    $created += $path
   }
 }
-$GstackConfig = Join-Path $OcConfig 'gstack.jsonc'
-if (-not (Test-Path $GstackConfig)) {
-  Copy-Item (Join-Path $RepoRoot 'gstack\gstack.jsonc') $GstackConfig
-  Write-Host '  installed gstack.jsonc (was missing).'
-} else {
-  Write-Host '  gstack.jsonc exists; left untouched (diff against repo gstack/ if drifted).'
-}
+Write-Host "  created: $($created -join '; ')"
+Write-Host '  the stock OpenCode shortcut was not modified.'
 
 $LegacyFiles = @(
   (Join-Path $OcConfig 'agents\team-lead.md'),
@@ -85,12 +182,17 @@ $LegacyFiles = @(
   (Join-Path $OcConfig 'ensemble.db'),
   (Join-Path $OcConfig 'ensemble.db-shm'),
   (Join-Path $OcConfig 'ensemble.db-wal'),
-  (Join-Path $OcConfig 'profiles\team.json'),
-  (Join-Path $OcConfig 'profiles\team'),
-  (Join-Path $OcConfig 'profiles\product.json'),
-  (Join-Path $OcConfig 'profiles\product'),
-  (Join-Path $OcConfig 'profiles')
+  (Join-Path $OcConfig 'profiles'),
+  (Join-Path $Bin 'oc-product.cmd'),
+  (Join-Path $env:APPDATA 'npm\oc-product.cmd')
 )
+# Shortcuts created by the retired two-mode design. The stock OpenCode shortcut is
+# deliberately absent from this list.
+foreach ($desktop in @((Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'), [Environment]::GetFolderPath('Desktop'))) {
+  foreach ($label in @('OpenCode PRODUCT', 'OpenCode TEAM')) {
+    $LegacyFiles += (Join-Path $desktop "$label.lnk")
+  }
+}
 $Present = $LegacyFiles | Where-Object { Test-Path -LiteralPath $_ }
 if ($Present.Count -eq 0) {
   Write-Host '  no retired artifacts found.'
@@ -106,5 +208,6 @@ if ($Present.Count -eq 0) {
 
 Write-Host ''
 Write-Host 'Restore complete.'
-Write-Host 'Superpowers installs from the global plugin declaration on first OpenCode launch.'
-Write-Host 'Next: authenticate providers locally, then open OpenCode and run /stable.'
+Write-Host 'Modes: oc-vanilla (upstream Superpowers), oc-stable (cost-control lead), oc-core (autonomous Hackathon).'
+Write-Host 'Desktop: stock OpenCode = Stable, plus OpenCode Vanilla and OpenCode Core shortcuts.'
+Write-Host 'Next: authenticate providers, then run one of the oc-* commands or open a shortcut.'

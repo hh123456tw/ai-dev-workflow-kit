@@ -1,57 +1,77 @@
-# OpenCode Desktop / TUI rebuild
+# OpenCode Desktop
 
-The tracked config files are portable. Provider authentication is not.
+The tracked configuration is portable. Provider authentication is not.
 
-## How this repo is used
+## What Desktop looks like after setup
 
-Open OpenCode normally (the stock shortcut). The global config sets
-`"default_agent": "stable-lead"`, so the session starts as the lead, and the
-global plugin entry loads Superpowers. `/stable <request>` also works at any time.
+Three independent Desktop entries:
 
-There is no profile to switch, no launcher wrapper, and no per-machine model file.
-Model routing lives in `global/opencode.jsonc`.
+| Shortcut | Mode | Default agent | User data directory |
+| --- | --- | --- | --- |
+| `OpenCode` (stock) | Stable | `stable-lead` | `%APPDATA%\ai.opencode.desktop` |
+| `OpenCode Vanilla` | Vanilla | `build` | `%APPDATA%\ai.opencode.desktop-vanilla` |
+| `OpenCode Core` | Core | `core-lead` | `%APPDATA%\ai.opencode.desktop-core` |
 
-## Layout
+The stock shortcut is created by the OpenCode installer and is never modified by
+this repository. Setup only adds the two new shortcuts.
 
-| Path | Purpose |
-| --- | --- |
-| `agents/stable-lead.md` | The single lead definition, deployed to the global agents directory. |
-| `agents/explorer.md`, `agents/implementer.md`, `agents/reviewer.md`, `agents/test-writer.md` | Bounded DeepSeek workers, deployed globally. |
-| `commands/stable.md`, `commands/gstack-*.md` | The `/stable` and namespaced gstack commands. |
-| `global/opencode.jsonc` | Portable global config, installed only when none exists. |
+All three use a distinct `--user-data-dir`, which separates UI state and the
+session database per mode. Provider authentication is shared because the data and
+auth paths are not changed.
+
+**Verified limitation: only one Desktop instance at a time.** On OpenCode Desktop
+1.18.31, launching a second instance with a different `--user-data-dir` exits
+immediately with code 0; the fresh directory is never written and the default
+`lockfile` is untouched. The app calls `requestSingleInstanceLock()` and quits on
+failure, and this build does not separate that lock by `--user-data-dir`.
+Reproduced with three target directories and both argument forms.
+
+The shortcuts are therefore alternative entries, not concurrent windows. Close
+the running instance before opening another mode. The CLI launchers (`oc-vanilla`,
+`oc-stable`, `oc-core`) are unaffected and can run concurrently.
+
+## How the wrappers work
+
+`OpenCode Vanilla` and `OpenCode Core` launch PowerShell wrappers deployed to
+`~/.config/opencode/modes/`:
+
+- `desktop-vanilla.ps1` sets `OPENCODE_CONFIG` to the Vanilla mode config and
+  starts OpenCode with `--user-data-dir=...\ai.opencode.desktop-vanilla`.
+- `desktop-core.ps1` additionally sets `OPENCODE_CONFIG_DIR`,
+  `XDG_CONFIG_HOME`, `OPENCODE_DISABLE_EXTERNAL_SKILLS=1`, and
+  `OPENCODE_DISABLE_DEFAULT_PLUGINS=1`, then starts OpenCode with
+  `--user-data-dir=...\ai.opencode.desktop-core`.
+
+The isolated `XDG_CONFIG_HOME` is what stops the global full-Superpowers config
+from being read into Core. Verified with `opencode debug config` and
+`opencode debug skill`.
+
+## Limits
+
+- Session history is separate per mode.
+- `opencode://` deep links may route only to the stock Stable instance.
+- Running three instances consumes more memory.
+- An OpenCode Desktop update can change Electron launch behavior. Re-run setup
+  and re-verify if a shortcut stops isolating correctly.
 
 ## Rebuild
 
-1. Install OpenCode.
-2. Authenticate the same providers locally.
-3. Run `scripts/setup-windows.ps1` or `scripts/setup-unix.sh`.
-4. Open OpenCode.
+1. Install OpenCode and OpenCode Desktop.
+2. Authenticate providers locally.
+3. Run `scripts/setup-windows.ps1`.
+4. Open the stock shortcut for Stable, or the Vanilla/Core shortcuts.
 
 ## Remove stale deployed artifacts
 
-Earlier generations deployed a multi-agent Team workflow, a Team profile, a
-product profile, and an `oc-product` wrapper. All of that is retired. Delete these
-from the deployed OpenCode config directory (for example
-`%USERPROFILE%\.config\opencode\` on Windows or `~/.config/opencode/` on
-macOS/Linux):
-
-- `agents/team-lead.md`, `agents/team-scout.md`, `agents/team-builder.md`,
-  `agents/team-reviewer.md`
-- `commands/team.md`
-- the whole `profiles/` directory (`team.json`, `team/`, `product.json`,
-  `product/`)
-- `ensemble.json`, `ensemble.db`, `ensemble.db-shm`, `ensemble.db-wal`
-- any `@hueyexe/opencode-ensemble` entry still present in the global
-  `opencode.jsonc`
-- the `oc-product` wrapper, wherever it was installed (for example
-  `%APPDATA%\npm\oc-product.cmd`)
-
-Setup's `-CleanLegacy` (Windows) / `--clean-legacy` (Unix) removes everything in
-the config directory. The `oc-product` wrapper lives outside it and must be
-removed by hand.
+Earlier generations deployed a multi-agent Team workflow, a product profile, and
+an `oc-product` wrapper. Setup lists them; `-CleanLegacy` removes the ones inside
+the config directory. The `oc-product` wrapper outside it must be removed by hand.
 
 ## UI/TUI preferences
 
-OpenCode keeps TUI-specific preferences separately from main provider config. If you have a personal `tui.json` you want to preserve, copy a **secret-free** version into this directory manually and commit it.
+OpenCode keeps TUI-specific preferences separately from provider config. If you
+have a personal `tui.json` you want to preserve, copy a **secret-free** version
+into this directory manually and commit it.
 
-Do not copy a global provider config into Git unless you have inspected it and replaced every credential with environment/file references.
+Do not copy a global provider config into Git unless you have inspected it and
+replaced every credential with environment/file references.

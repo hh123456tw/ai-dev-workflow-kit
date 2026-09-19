@@ -170,14 +170,42 @@ OPENCODE_DISABLE_EXTERNAL_SKILLS=1
 OPENCODE_DISABLE_DEFAULT_PLUGINS=1
 ```
 
-This isolates the single-instance lock, UI state, and session database. Provider authentication remains shared because the data/auth path is not changed.
+Provider authentication remains shared because the data/auth path is not changed.
+
+### 8.2.1 Verified limitation: one Desktop instance at a time
+
+The original design claimed all three Desktop entries could run simultaneously. That
+claim is **wrong for OpenCode Desktop 1.18.31** and was removed after direct testing.
+
+Observed on 2026-09-19, with the stock instance running:
+
+- Launching `OpenCode.exe --user-data-dir=<fresh dir>` exits immediately with code 0.
+- The fresh user-data directory stays completely empty.
+- The default `%APPDATA%\ai.opencode.desktop\lockfile` is not modified.
+- Reproduced with three different target directories and both
+  `--user-data-dir=<path>` and `--user-data-dir <path>` argument forms.
+
+The app calls `app.requestSingleInstanceLock()` with no options and exits when it
+fails. On this build the lock is not separated by `--user-data-dir`, so a second
+Desktop instance cannot start while another is running.
+
+Consequences:
+
+- The three Desktop shortcuts are **alternative entries, not concurrent windows**.
+  Only one Desktop instance runs at a time; close it before opening another mode.
+- The three **CLI** launchers are unaffected and can run concurrently, because they
+  are separate processes with their own config and environment.
+- Core's config isolation is still verified and effective for both the CLI launcher
+  and the Desktop wrapper; only concurrency is unavailable.
 
 ### 8.3 Desktop limitations
 
-- Session history is separate for Stable, Vanilla, and Core.
-- `opencode://` deep links may route only to the original Stable instance.
-- Simultaneous instances consume additional memory.
-- An OpenCode Desktop update can change Electron launch behavior; setup verification must catch regressions.
+- Only one Desktop instance at a time, as verified in §8.2.1.
+- Session history is separate per mode, because each mode uses its own user-data
+  directory whenever it is the running instance.
+- `opencode://` deep links route to whichever instance is running.
+- An OpenCode Desktop update can change Electron launch behavior; re-verify if a
+  shortcut stops isolating correctly.
 
 ## 9. Setup Behavior
 
@@ -235,6 +263,16 @@ Nothing is committed/pushed as complete until every gate is green.
 - Verify three main OpenCode processes coexist with distinct user-data directories.
 - Verify the Core sidecar resolves `core-lead` and no full Superpowers plugin/bootstrap.
 - Close only the test-launched Vanilla/Core instances after verification.
+
+**Revised after the §8.2.1 finding.** The coexistence check is not achievable on
+OpenCode Desktop 1.18.31. The gate becomes:
+
+- Verify the Core and Vanilla wrappers resolve the correct mode config, agent, and
+  skill set when their environment is applied (already covered by §10.2).
+- Verify the stock shortcut is unchanged.
+- Verify that launching a second Desktop instance exits cleanly and leaves the
+  running instance intact, rather than corrupting state.
+- Verify the three CLI launchers run as independent concurrent processes.
 
 ### 10.5 Regression and review
 
