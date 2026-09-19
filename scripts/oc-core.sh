@@ -12,4 +12,6 @@ export OPENCODE_CONFIG_DIR="$MODE"
 export XDG_CONFIG_HOME="$MODE/xdg"
 export OPENCODE_DISABLE_EXTERNAL_SKILLS=1
 unset OPENCODE_CONFIG_CONTENT 2>/dev/null || true
+# Default provider plugins are required to resolve the pinned model.
+unset OPENCODE_DISABLE_DEFAULT_PLUGINS
 exec opencode --pure "$@"

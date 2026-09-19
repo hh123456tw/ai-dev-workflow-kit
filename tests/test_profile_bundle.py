@@ -37,6 +37,26 @@ HEAVY_SKILLS = [
 
 SUPERPOWERS_SPEC = "superpowers@git+https://github.com/obra/superpowers.git"
 
+# Core must actively clear an inherited OPENCODE_DISABLE_DEFAULT_PLUGINS and must
+# never assign it on: default provider plugins are required to resolve the pinned
+# model. A plain "does not mention the variable" check is not enough, because the
+# clear form necessarily names it.
+CORE_DEFAULT_PLUGINS_ASSIGN = re.compile(
+    r"\$env:OPENCODE_DISABLE_DEFAULT_PLUGINS\s*="
+    r"|export\s+OPENCODE_DISABLE_DEFAULT_PLUGINS\s*="
+)
+CORE_DEFAULT_PLUGINS_CLEAR = re.compile(
+    r"Remove-Item\s+Env:OPENCODE_DISABLE_DEFAULT_PLUGINS"
+    r"|^\s*unset\s+OPENCODE_DISABLE_DEFAULT_PLUGINS",
+    re.MULTILINE,
+)
+
+CORE_ENTRY_POINTS = (
+    "scripts/oc-core.ps1",
+    "scripts/oc-core.sh",
+    "scripts/desktop-core.ps1",
+)
+
 RETIRED_WORKFLOW = re.compile(
     r"(?i)matt\s+pocock|grill|to-spec|to-tickets|wayfinder|\bDAG\b|TEAM V2|Ensemble"
 )
@@ -75,6 +95,19 @@ class ThreeModeBundleTest(unittest.TestCase):
 
     def read_json(self, relative: str) -> dict:
         return json.loads(self.read_text(relative))
+
+    def assert_core_clears_default_plugins(self, relative: str) -> None:
+        content = self.read_text(relative)
+        self.assertNotRegex(
+            content,
+            CORE_DEFAULT_PLUGINS_ASSIGN,
+            f"{relative}: default provider plugins are required for model resolution",
+        )
+        self.assertRegex(
+            content,
+            CORE_DEFAULT_PLUGINS_CLEAR,
+            f"{relative}: must clear an inherited OPENCODE_DISABLE_DEFAULT_PLUGINS",
+        )
 
     def test_retired_artifacts_are_gone(self) -> None:
         for relative in RETIRED_PATHS:
@@ -132,11 +165,9 @@ class ThreeModeBundleTest(unittest.TestCase):
             self.assertIn("XDG_CONFIG_HOME", content)
             self.assertIn("OPENCODE_CONFIG_DIR", content)
             self.assertIn("OPENCODE_DISABLE_EXTERNAL_SKILLS", content)
-            self.assertNotIn(
-                "OPENCODE_DISABLE_DEFAULT_PLUGINS",
-                content,
-                "default provider plugins are required for model resolution",
-            )
+
+        for relative in CORE_ENTRY_POINTS:
+            self.assert_core_clears_default_plugins(relative)
 
         for content in (vanilla, vanilla_sh):
             self.assertNotIn("--pure", content)
@@ -167,11 +198,7 @@ class ThreeModeBundleTest(unittest.TestCase):
         self.assertIn("XDG_CONFIG_HOME", core)
         self.assertIn("OPENCODE_CONFIG_DIR", core)
         self.assertIn("OPENCODE_DISABLE_EXTERNAL_SKILLS", core)
-        self.assertNotIn(
-            "OPENCODE_DISABLE_DEFAULT_PLUGINS",
-            core,
-            "default provider plugins are required for model resolution",
-        )
+        self.assert_core_clears_default_plugins("scripts/desktop-core.ps1")
         # The Desktop app is Electron and does not forward --pure to its OpenCode
         # sidecar, so Desktop isolation rests on OPENCODE_CONFIG_DIR,
         # XDG_CONFIG_HOME, and OPENCODE_DISABLE_EXTERNAL_SKILLS; --pure is required

@@ -15,5 +15,7 @@ $env:OPENCODE_CONFIG_DIR = $mode
 $env:XDG_CONFIG_HOME = Join-Path $mode 'xdg'
 $env:OPENCODE_DISABLE_EXTERNAL_SKILLS = '1'
 Remove-Item Env:OPENCODE_CONFIG_CONTENT -ErrorAction SilentlyContinue
+# Default provider plugins are required to resolve the pinned model.
+Remove-Item Env:OPENCODE_DISABLE_DEFAULT_PLUGINS -ErrorAction SilentlyContinue
 & opencode --pure @args
 exit $LASTEXITCODE

@@ -35,6 +35,16 @@ function Get-Flat([string]$Content) {
   return ($Content -replace '\s+', ' ')
 }
 
+function Assert-CoreClearsDefaultPlugins([string]$Content, [string]$Label) {
+  # Core must actively clear an inherited OPENCODE_DISABLE_DEFAULT_PLUGINS and
+  # must never assign it on: default provider plugins are required to resolve
+  # the pinned model. A static "does not mention the variable" check is not
+  # enough, because the clear form necessarily names it.
+  Assert-True ($Content -notmatch '(?m)\$env:OPENCODE_DISABLE_DEFAULT_PLUGINS\s*=') "$Label must not set `$env:OPENCODE_DISABLE_DEFAULT_PLUGINS: default provider plugins are required for model resolution"
+  Assert-True ($Content -notmatch '(?m)export\s+OPENCODE_DISABLE_DEFAULT_PLUGINS\s*=') "$Label must not export OPENCODE_DISABLE_DEFAULT_PLUGINS: default provider plugins are required for model resolution"
+  Assert-True ($Content -match '(?m)Remove-Item\s+Env:OPENCODE_DISABLE_DEFAULT_PLUGINS|(?m)^\s*unset\s+OPENCODE_DISABLE_DEFAULT_PLUGINS') "$Label must clear an inherited OPENCODE_DISABLE_DEFAULT_PLUGINS so default provider plugins stay enabled"
+}
+
 $coreSkills = @(
   'test-driven-development',
   'systematic-debugging',
@@ -108,7 +118,13 @@ Assert-True ($coreLauncher -match '--pure') 'Core launcher must run OpenCode in 
 Assert-True ($coreLauncher -match 'XDG_CONFIG_HOME') 'Core launcher must isolate XDG_CONFIG_HOME'
 Assert-True ($coreLauncher -match 'OPENCODE_CONFIG_DIR') 'Core launcher must isolate OPENCODE_CONFIG_DIR'
 Assert-True ($coreLauncher -match 'OPENCODE_DISABLE_EXTERNAL_SKILLS') 'Core launcher must disable external skills'
-Assert-True ($coreLauncher -notmatch 'OPENCODE_DISABLE_DEFAULT_PLUGINS') 'Core launcher must not disable default plugins: built-in provider plugins are required for model resolution'
+Assert-CoreClearsDefaultPlugins $coreLauncher 'Core launcher'
+
+$coreLauncherSh = Read-Text 'scripts\oc-core.sh'
+Assert-True ($coreLauncherSh -match '--pure') 'Core shell launcher must run OpenCode in pure mode'
+Assert-True ($coreLauncherSh -match 'OPENCODE_CONFIG_DIR') 'Core shell launcher must isolate OPENCODE_CONFIG_DIR'
+Assert-True ($coreLauncherSh -match 'OPENCODE_DISABLE_EXTERNAL_SKILLS') 'Core shell launcher must disable external skills'
+Assert-CoreClearsDefaultPlugins $coreLauncherSh 'Core shell launcher'
 
 $vanillaLauncher = Read-Text 'scripts\oc-vanilla.ps1'
 Assert-True ($vanillaLauncher -notmatch '--pure') 'Vanilla launcher must not use pure mode'
@@ -121,7 +137,7 @@ Assert-True ($desktopVanilla -match 'desktop-vanilla') 'Vanilla Desktop wrapper 
 Assert-True ($desktopCore -match 'XDG_CONFIG_HOME') 'Core Desktop wrapper must isolate XDG_CONFIG_HOME'
 Assert-True ($desktopCore -match 'OPENCODE_CONFIG_DIR') 'Core Desktop wrapper must isolate OPENCODE_CONFIG_DIR'
 Assert-True ($desktopCore -match 'OPENCODE_DISABLE_EXTERNAL_SKILLS') 'Core Desktop wrapper must disable external skills'
-Assert-True ($desktopCore -notmatch 'OPENCODE_DISABLE_DEFAULT_PLUGINS') 'Core Desktop wrapper must not disable default plugins: built-in provider plugins are required for model resolution'
+Assert-CoreClearsDefaultPlugins $desktopCore 'Core Desktop wrapper'
 # The Desktop app is Electron and does not forward --pure to its OpenCode sidecar,
 # so Desktop Core isolates through its own OPENCODE_CONFIG_DIR, XDG_CONFIG_HOME,
 # and OPENCODE_DISABLE_EXTERNAL_SKILLS; --pure is required only of the two CLI Core

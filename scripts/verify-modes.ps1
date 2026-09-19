@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 $OcConfig = Join-Path $env:USERPROFILE '.config\opencode'
 $failures = @()
 
-function Get-ResolvedConfig([string]$mode) {
+function Get-ResolvedConfig([string]$mode, [bool]$pure = $false) {
   $dir = Join-Path $OcConfig "modes\$mode"
   $config = Join-Path $dir 'opencode.jsonc'
   if (-not (Test-Path -LiteralPath $config)) { throw "Mode '$mode' is not deployed at $dir. Run setup first." }
@@ -20,7 +20,6 @@ function Get-ResolvedConfig([string]$mode) {
     $env:XDG_CONFIG_HOME = Join-Path $dir 'xdg'
     $env:OPENCODE_DISABLE_EXTERNAL_SKILLS = '1'
   }
-  $pure = if ($mode -eq 'core') { '--pure' } else { $null }
   $configJson = if ($pure) { opencode debug config --pure 2>&1 | Out-String } else { opencode debug config 2>&1 | Out-String }
   $skillJson = if ($pure) { opencode debug skill --pure 2>&1 | Out-String } else { opencode debug skill 2>&1 | Out-String }
   # Non-generating model probe: list the provider registry so a config string
@@ -52,6 +51,19 @@ function Assert-ModelResolves([string]$mode, [string]$modelList, [string]$pinned
   Assert-True $available "$mode resolves the pinned primary model $pinned without a generation call"
 }
 
+function Assert-CoreIsolation([string]$label, [hashtable]$resolved) {
+  Assert-True ($resolved.config.default_agent -eq 'core-lead') "$label default_agent is core-lead"
+  Assert-True (@($resolved.config.plugin).Count -eq 0) "$label no plugin is loaded"
+  Assert-True ($resolved.config.model -eq 'openai/gpt-5.6-sol') "$label primary model is pinned"
+  Assert-ModelResolves $label $resolved.models 'openai/gpt-5.6-sol'
+  foreach ($skill in $coreSkills) {
+    Assert-True (Test-Skill $resolved.skills $skill) "$label Core skill visible: $skill"
+  }
+  foreach ($skill in $heavySkills) {
+    Assert-True (-not (Test-Skill $resolved.skills $skill)) "$label heavy skill hidden: $skill"
+  }
+}
+
 $superpowersSpec = 'superpowers@git+https://github.com/obra/superpowers.git'
 $coreSkills = @(
   'test-driven-development', 'systematic-debugging', 'verification-before-completion',
@@ -78,18 +90,17 @@ foreach ($skill in @('brainstorming', 'subagent-driven-development', 'test-drive
   Assert-True (Test-Skill $stable.skills $skill) "skill visible: $skill"
 }
 
-Write-Host 'Core:'
-$core = Get-ResolvedConfig 'core'
-Assert-True ($core.config.default_agent -eq 'core-lead') 'default_agent is core-lead'
-Assert-True (@($core.config.plugin).Count -eq 0) 'no plugin is loaded'
-Assert-True ($core.config.model -eq 'openai/gpt-5.6-sol') 'primary model is pinned'
-Assert-ModelResolves 'Core' $core.models 'openai/gpt-5.6-sol'
-foreach ($skill in $coreSkills) {
-  Assert-True (Test-Skill $core.skills $skill) "Core skill visible: $skill"
-}
-foreach ($skill in $heavySkills) {
-  Assert-True (-not (Test-Skill $core.skills $skill)) "heavy skill hidden: $skill"
-}
+# Core is verified twice. The CLI path runs with --pure; the Desktop path does
+# not, because Electron does not forward --pure to its OpenCode sidecar. Both must
+# show the same isolation: zero plugins, core-lead, the six Core skills visible,
+# and the four heavy skills hidden. The Desktop path had no executed coverage.
+Write-Host 'Core (CLI, --pure):'
+$coreCli = Get-ResolvedConfig 'core' $true
+Assert-CoreIsolation 'Core CLI' $coreCli
+
+Write-Host 'Core (Desktop, no --pure):'
+$coreDesktop = Get-ResolvedConfig 'core' $false
+Assert-CoreIsolation 'Core Desktop' $coreDesktop
 
 $env:OPENCODE_CONFIG = $null
 $env:OPENCODE_CONFIG_DIR = $null
