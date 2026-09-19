@@ -38,9 +38,10 @@ the running instance before opening another mode. The CLI launchers (`oc-vanilla
 - `desktop-vanilla.ps1` sets `OPENCODE_CONFIG` to the Vanilla mode config and
   starts OpenCode with `--user-data-dir=...\ai.opencode.desktop-vanilla`.
 - `desktop-core.ps1` additionally sets `OPENCODE_CONFIG_DIR`,
-  `XDG_CONFIG_HOME`, `OPENCODE_DISABLE_EXTERNAL_SKILLS=1`, and
-  `OPENCODE_DISABLE_DEFAULT_PLUGINS=1`, then starts OpenCode with
-  `--user-data-dir=...\ai.opencode.desktop-core`.
+  `XDG_CONFIG_HOME`, and `OPENCODE_DISABLE_EXTERNAL_SKILLS=1`, then starts
+  OpenCode with `--user-data-dir=...\ai.opencode.desktop-core`. It deliberately
+  does not set `OPENCODE_DISABLE_DEFAULT_PLUGINS`, because that also removes the
+  built-in provider plugins needed to resolve the pinned `openai/gpt-5.6-sol`.
 
 The isolated `XDG_CONFIG_HOME` is what stops the global full-Superpowers config
 from being read into Core. Verified with `opencode debug config` and

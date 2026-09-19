@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Core mode: autonomous Hackathon/MVP lead with a curated skill set.
-# Isolation: own config dir, own XDG config root, no external skills, no default plugins.
+# Isolation: own config dir, own XDG config root, no external skills.
+# Built-in provider plugins stay enabled so the pinned model can resolve.
 set -euo pipefail
 MODE="$HOME/.config/opencode/modes/core"
 CONFIG="$MODE/opencode.jsonc"
@@ -10,6 +11,5 @@ export OPENCODE_CONFIG="$CONFIG"
 export OPENCODE_CONFIG_DIR="$MODE"
 export XDG_CONFIG_HOME="$MODE/xdg"
 export OPENCODE_DISABLE_EXTERNAL_SKILLS=1
-export OPENCODE_DISABLE_DEFAULT_PLUGINS=1
 unset OPENCODE_CONFIG_CONTENT 2>/dev/null || true
 exec opencode --pure "$@"

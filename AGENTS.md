@@ -52,9 +52,12 @@ Core must not expose `brainstorming`, `writing-plans`,
 ## Isolation contract
 
 Core runs with `--pure`, its own `OPENCODE_CONFIG_DIR`, its own
-`XDG_CONFIG_HOME`, `OPENCODE_DISABLE_EXTERNAL_SKILLS=1`, and
-`OPENCODE_DISABLE_DEFAULT_PLUGINS=1`. Vanilla and Stable inherit the global
-config directory and the full Superpowers plugin.
+`XDG_CONFIG_HOME`, and `OPENCODE_DISABLE_EXTERNAL_SKILLS=1`. Core deliberately
+does not set `OPENCODE_DISABLE_DEFAULT_PLUGINS`, because that also removes the
+built-in provider plugins (including the OpenAI provider) that resolve the pinned
+`openai/gpt-5.6-sol`; without them Core fails with `ProviderModelNotFoundError`.
+Vanilla and Stable inherit the global config directory and the full Superpowers
+plugin.
 
 Core skills are copied at setup time from the installed Superpowers package and
 are git-ignored. The repository pins the required Superpowers version (6.3.0)

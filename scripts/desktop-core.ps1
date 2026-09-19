@@ -21,7 +21,6 @@ $env:OPENCODE_CONFIG = $config
 $env:OPENCODE_CONFIG_DIR = $mode
 $env:XDG_CONFIG_HOME = Join-Path $mode 'xdg'
 $env:OPENCODE_DISABLE_EXTERNAL_SKILLS = '1'
-$env:OPENCODE_DISABLE_DEFAULT_PLUGINS = '1'
 Remove-Item Env:OPENCODE_CONFIG_CONTENT -ErrorAction SilentlyContinue
 
 $userData = Join-Path $env:APPDATA 'ai.opencode.desktop-core'

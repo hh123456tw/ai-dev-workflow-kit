@@ -132,7 +132,11 @@ class ThreeModeBundleTest(unittest.TestCase):
             self.assertIn("XDG_CONFIG_HOME", content)
             self.assertIn("OPENCODE_CONFIG_DIR", content)
             self.assertIn("OPENCODE_DISABLE_EXTERNAL_SKILLS", content)
-            self.assertIn("OPENCODE_DISABLE_DEFAULT_PLUGINS", content)
+            self.assertNotIn(
+                "OPENCODE_DISABLE_DEFAULT_PLUGINS",
+                content,
+                "default provider plugins are required for model resolution",
+            )
 
         for content in (vanilla, vanilla_sh):
             self.assertNotIn("--pure", content)

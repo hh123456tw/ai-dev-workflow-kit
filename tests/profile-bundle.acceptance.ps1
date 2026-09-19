@@ -108,7 +108,7 @@ Assert-True ($coreLauncher -match '--pure') 'Core launcher must run OpenCode in 
 Assert-True ($coreLauncher -match 'XDG_CONFIG_HOME') 'Core launcher must isolate XDG_CONFIG_HOME'
 Assert-True ($coreLauncher -match 'OPENCODE_CONFIG_DIR') 'Core launcher must isolate OPENCODE_CONFIG_DIR'
 Assert-True ($coreLauncher -match 'OPENCODE_DISABLE_EXTERNAL_SKILLS') 'Core launcher must disable external skills'
-Assert-True ($coreLauncher -match 'OPENCODE_DISABLE_DEFAULT_PLUGINS') 'Core launcher must disable default plugins'
+Assert-True ($coreLauncher -notmatch 'OPENCODE_DISABLE_DEFAULT_PLUGINS') 'Core launcher must not disable default plugins: built-in provider plugins are required for model resolution'
 
 $vanillaLauncher = Read-Text 'scripts\oc-vanilla.ps1'
 Assert-True ($vanillaLauncher -notmatch '--pure') 'Vanilla launcher must not use pure mode'

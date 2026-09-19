@@ -1,5 +1,6 @@
 # Core mode: autonomous Hackathon/MVP lead with a curated skill set.
-# Isolation: own config dir, own XDG config root, no external skills, no default plugins.
+# Isolation: own config dir, own XDG config root, no external skills.
+# Built-in provider plugins stay enabled so the pinned model can resolve.
 $ErrorActionPreference = 'Stop'
 $mode = Join-Path $env:USERPROFILE '.config\opencode\modes\core'
 $config = Join-Path $mode 'opencode.jsonc'
@@ -13,7 +14,6 @@ $env:OPENCODE_CONFIG = $config
 $env:OPENCODE_CONFIG_DIR = $mode
 $env:XDG_CONFIG_HOME = Join-Path $mode 'xdg'
 $env:OPENCODE_DISABLE_EXTERNAL_SKILLS = '1'
-$env:OPENCODE_DISABLE_DEFAULT_PLUGINS = '1'
 Remove-Item Env:OPENCODE_CONFIG_CONTENT -ErrorAction SilentlyContinue
 & opencode --pure @args
 exit $LASTEXITCODE
