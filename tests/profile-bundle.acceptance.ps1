@@ -119,6 +119,14 @@ $desktopVanilla = Read-Text 'scripts\desktop-vanilla.ps1'
 Assert-True ($desktopCore -match 'desktop-core') 'Core Desktop wrapper must use its own user-data directory'
 Assert-True ($desktopVanilla -match 'desktop-vanilla') 'Vanilla Desktop wrapper must use its own user-data directory'
 Assert-True ($desktopCore -match 'XDG_CONFIG_HOME') 'Core Desktop wrapper must isolate XDG_CONFIG_HOME'
+Assert-True ($desktopCore -match 'OPENCODE_CONFIG_DIR') 'Core Desktop wrapper must isolate OPENCODE_CONFIG_DIR'
+Assert-True ($desktopCore -match 'OPENCODE_DISABLE_EXTERNAL_SKILLS') 'Core Desktop wrapper must disable external skills'
+Assert-True ($desktopCore -notmatch 'OPENCODE_DISABLE_DEFAULT_PLUGINS') 'Core Desktop wrapper must not disable default plugins: built-in provider plugins are required for model resolution'
+# The Desktop app is Electron and does not forward --pure to its OpenCode sidecar,
+# so Desktop Core isolates through its own OPENCODE_CONFIG_DIR, XDG_CONFIG_HOME,
+# and OPENCODE_DISABLE_EXTERNAL_SKILLS; --pure is required only of the two CLI Core
+# launchers. Guard against reintroducing --pure here, where it does nothing.
+Assert-True ($desktopCore -notmatch '--pure') 'Core Desktop wrapper must not rely on --pure: Electron does not forward it, so Desktop isolation rests on OPENCODE_CONFIG_DIR, XDG_CONFIG_HOME, and OPENCODE_DISABLE_EXTERNAL_SKILLS'
 Assert-True ($desktopVanilla -notmatch 'XDG_CONFIG_HOME') 'Vanilla Desktop wrapper must not isolate XDG_CONFIG_HOME'
 Assert-True ($desktopCore -match 'user-data-dir') 'Core Desktop wrapper must pass --user-data-dir'
 Assert-True ($desktopVanilla -match 'user-data-dir') 'Vanilla Desktop wrapper must pass --user-data-dir'

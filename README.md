@@ -44,7 +44,7 @@ Vanilla 功能正確但拓撲不固定（2 到 17 個 session），時間與成�
 - Vanilla 與 Stable 需要完整 Superpowers plugin 與 bootstrap。
 - Core 必須完全看不到 bootstrap 與重型 skills。
 
-因此 Core 使用獨立的 config dir、獨立的 `XDG_CONFIG_HOME`、`--pure`，並停用外部 skills 與預設 plugins。這已用 `opencode debug config` 與 `opencode debug skill` 驗證：Core 只看到 6 個 skills，plugin 為 none。
+因此 Core 使用獨立的 config dir、獨立的 `XDG_CONFIG_HOME`，並停用外部 skills。CLI 的 Core launcher 另外以 `--pure` 執行；Desktop 的 Core wrapper 因為 Electron 不會把 `--pure` 傳給 OpenCode sidecar，改用上述隔離的 config dir／`XDG_CONFIG_HOME` 達成同樣效果。Core 刻意**不**停用預設 plugins，因為那會一併移除解析 pinned model 所需的內建 provider plugins。這已用 `opencode debug config` 與 `opencode debug skill` 驗證：Core 只看到 6 個 skills，plugin 為 none。
 
 ## 入口
 

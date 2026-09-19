@@ -51,10 +51,14 @@ Core must not expose `brainstorming`, `writing-plans`,
 
 ## Isolation contract
 
-Core runs with `--pure`, its own `OPENCODE_CONFIG_DIR`, its own
-`XDG_CONFIG_HOME`, and `OPENCODE_DISABLE_EXTERNAL_SKILLS=1`. Core deliberately
-does not set `OPENCODE_DISABLE_DEFAULT_PLUGINS`, because that also removes the
-built-in provider plugins (including the OpenAI provider) that resolve the pinned
+Core sets its own `OPENCODE_CONFIG_DIR`, its own `XDG_CONFIG_HOME`, and
+`OPENCODE_DISABLE_EXTERNAL_SKILLS=1`. The two CLI Core launchers (`oc-core.ps1`,
+`oc-core.sh`) additionally run with `--pure`. The Desktop Core wrapper does not,
+because OpenCode Desktop is Electron and does not forward `--pure` to its OpenCode
+sidecar, so Desktop isolation rests on the same config dir, `XDG_CONFIG_HOME`, and
+external-skills switch. Core deliberately does not set
+`OPENCODE_DISABLE_DEFAULT_PLUGINS`, because that also removes the built-in
+provider plugins (including the OpenAI provider) that resolve the pinned
 `openai/gpt-5.6-sol`; without them Core fails with `ProviderModelNotFoundError`.
 Vanilla and Stable inherit the global config directory and the full Superpowers
 plugin.

@@ -165,6 +165,24 @@ class ThreeModeBundleTest(unittest.TestCase):
         self.assertIn("desktop-core", core)
         self.assertIn("desktop-vanilla", vanilla)
         self.assertIn("XDG_CONFIG_HOME", core)
+        self.assertIn("OPENCODE_CONFIG_DIR", core)
+        self.assertIn("OPENCODE_DISABLE_EXTERNAL_SKILLS", core)
+        self.assertNotIn(
+            "OPENCODE_DISABLE_DEFAULT_PLUGINS",
+            core,
+            "default provider plugins are required for model resolution",
+        )
+        # The Desktop app is Electron and does not forward --pure to its OpenCode
+        # sidecar, so Desktop isolation rests on OPENCODE_CONFIG_DIR,
+        # XDG_CONFIG_HOME, and OPENCODE_DISABLE_EXTERNAL_SKILLS; --pure is required
+        # only of the two CLI Core launchers.
+        self.assertNotIn(
+            "--pure",
+            core,
+            "the Desktop wrapper must not rely on --pure; Electron does not "
+            "forward it, so Desktop isolation rests on OPENCODE_CONFIG_DIR, "
+            "XDG_CONFIG_HOME, and OPENCODE_DISABLE_EXTERNAL_SKILLS",
+        )
         self.assertNotIn("XDG_CONFIG_HOME", vanilla)
 
     def test_setup_deploys_modes_and_pins_superpowers(self) -> None:

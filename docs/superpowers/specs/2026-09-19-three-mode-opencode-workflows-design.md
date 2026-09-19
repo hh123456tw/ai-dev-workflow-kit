@@ -172,10 +172,11 @@ OPENCODE_DISABLE_EXTERNAL_SKILLS=1
 Core deliberately does **not** set `OPENCODE_DISABLE_DEFAULT_PLUGINS`. That switch
 removes OpenCode's built-in provider plugins, including the OpenAI provider, so
 `openai/gpt-5.6-sol` fails to resolve at runtime with
-`ProviderModelNotFoundError`. `--pure` plus the isolated config dir and config
-root already exclude the Superpowers plugin, so the default provider plugins must
-stay enabled for the pinned model to load. Vanilla and Stable clear the variable
-so a value exported by a parent shell cannot leak into them.
+`ProviderModelNotFoundError`. The isolated config dir and `XDG_CONFIG_HOME` already
+exclude the Superpowers plugin (the Desktop wrapper does not pass `--pure`, because
+Electron does not forward it to the OpenCode sidecar), so the default provider
+plugins must stay enabled for the pinned model to load. Vanilla and Stable clear
+the variable so a value exported by a parent shell cannot leak into them.
 
 Provider authentication remains shared because the data/auth path is not changed.
 

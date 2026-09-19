@@ -4,7 +4,7 @@
 
 **Goal:** Close every finding from the independent review of commit `4c1966d`, then deploy and verify the three isolated OpenCode workflow modes end to end.
 
-**Architecture:** The three modes (Vanilla, Stable, Core) are config-isolated. Core runs `--pure` with its own `OPENCODE_CONFIG_DIR` and isolated config root so it cannot load the full Superpowers plugin, external skills, or default plugins. Vanilla and Stable inherit the global config directory and the full Superpowers plugin.
+**Architecture:** The three modes (Vanilla, Stable, Core) are config-isolated. Core uses its own `OPENCODE_CONFIG_DIR` and isolated config root, plus `--pure` on the two CLI launchers, so it cannot load the full Superpowers plugin or external skills; it keeps default provider plugins enabled so the pinned model resolves. Vanilla and Stable inherit the global config directory and the full Superpowers plugin.
 
 **Tech Stack:** OpenCode 1.18.31 CLI and Desktop, PowerShell 5.1 and Bash launchers, Superpowers 6.3.0, pytest, PowerShell acceptance scripts.
 
