@@ -148,6 +148,7 @@ class ThreeModeBundleTest(unittest.TestCase):
             "scripts/desktop-vanilla.ps1",
             "scripts/desktop-core.ps1",
             "scripts/opencode-desktop-common.ps1",
+            "scripts/verify-modes.ps1",
         ):
             self.assertTrue((ROOT / relative).is_file(), relative)
 
@@ -186,6 +187,67 @@ class ThreeModeBundleTest(unittest.TestCase):
         for launcher in ("oc-vanilla", "oc-stable", "oc-core"):
             self.assertIn(launcher, win)
 
+        # The stock OpenCode shortcut must be absent from the deletion list, not
+        # merely absent from a reassuring print.
+        self.assertNotIn("OpenCode.lnk", win)
+        self.assertNotIn("'OpenCode'", win)
+        self.assertRegex(
+            win, re.compile(r"\$label in @\('OpenCode PRODUCT', 'OpenCode TEAM'\)")
+        )
+        self.assertNotIn(".lnk", unix)
+        # Version handling compares against the pin and fails loudly, with no
+        # silent full-plugin fallback.
+        self.assertRegex(win, re.compile(r"\$version -ne \$RequiredSuperpowersVersion"))
+        self.assertRegex(
+            win,
+            re.compile(
+                r'throw "Superpowers \$version found but '
+                r'\$RequiredSuperpowersVersion is required'
+            ),
+        )
+        self.assertNotRegex(win, re.compile(r"(?i)fall\s?back"))
+        self.assertRegex(unix, re.compile(r"\$VERSION.*\$REQUIRED_SUPERPOWERS_VERSION"))
+        self.assertNotRegex(unix, re.compile(r"(?i)fall\s?back"))
+
+    def test_core_manifest_records_pinned_version_and_six_skills(self) -> None:
+        # The deployed manifest is git-ignored, so validate the shape the setup
+        # scripts generate: the pinned version plus exactly the six Core skills.
+        win = self.read_text("scripts/setup-windows.ps1")
+        unix = self.read_text("scripts/setup-unix.sh")
+
+        win_version_match = re.search(
+            r"\$RequiredSuperpowersVersion\s*=\s*'([^']+)'", win
+        )
+        win_skills_match = re.search(r"(?s)\$CoreSkills = @\((.*?)\n\)", win)
+        unix_version_match = re.search(
+            r'REQUIRED_SUPERPOWERS_VERSION="([^"]+)"', unix
+        )
+        unix_skills_match = re.search(r"(?s)CORE_SKILLS=\((.*?)\)", unix)
+        assert win_version_match is not None
+        assert win_skills_match is not None
+        assert unix_version_match is not None
+        assert unix_skills_match is not None
+
+        win_version = win_version_match.group(1)
+        win_skills = re.findall(r"'([a-z][a-z-]*)'", win_skills_match.group(1))
+        unix_version = unix_version_match.group(1)
+        unix_skills = re.findall(r"([a-z][a-z-]*)", unix_skills_match.group(1))
+
+        for name, version, skills in (
+            ("windows", win_version, win_skills),
+            ("unix", unix_version, unix_skills),
+        ):
+            manifest = {"superpowers_version": version, "skills": skills}
+            self.assertEqual(manifest["superpowers_version"], "6.3.0", name)
+            self.assertEqual(manifest["skills"], CORE_SKILLS, name)
+
+        # Both scripts write the resolved version and the skill list into the
+        # manifest they emit.
+        self.assertRegex(win, re.compile(r"superpowers_version\s*=\s*\$version"))
+        self.assertRegex(win, re.compile(r"skills\s*=\s*\$CoreSkills"))
+        self.assertRegex(unix, re.compile(r'"superpowers_version": "%s"'))
+        self.assertRegex(unix, re.compile(r'"skills": \['))
+
     def test_shared_global_config_and_workers(self) -> None:
         global_config = self.read_json("global/opencode.jsonc")
         self.assertEqual(global_config["default_agent"], "stable-lead")
@@ -199,7 +261,11 @@ class ThreeModeBundleTest(unittest.TestCase):
             "test-writer": self.read_text("agents/test-writer.md"),
         }
         for name, content in workers.items():
-            self.assertIn("model: deepseek/deepseek-v4-flash", content, name)
+            self.assertRegex(
+                content,
+                re.compile(r"(?m)^model: deepseek/deepseek-v4-flash\s*$"),
+                name,
+            )
             self.assertNotRegex(body(content), RETIRED_WORKFLOW, name)
             self.assertRegex(content, re.compile(r"(?m)^  task: deny\s*$"), name)
             self.assertRegex(content, re.compile(r"(?m)^  webfetch: deny\s*$"), name)

@@ -21,12 +21,21 @@ function Get-SuperpowersPackage {
   if (-not (Test-Path -LiteralPath $root)) { return $null }
   # The cache nests by source path, for example
   # packages/superpowers@git+https_/github.com/obra/superpowers.git/node_modules/superpowers
-  $found = Get-ChildItem -LiteralPath $root -Directory -Recurse -Depth 6 -Filter 'superpowers' -ErrorAction SilentlyContinue |
+  $candidates = Get-ChildItem -LiteralPath $root -Directory -Recurse -Depth 6 -Filter 'superpowers' -ErrorAction SilentlyContinue |
     Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'package.json') } |
-    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'skills') } |
-    Select-Object -First 1
-  if ($found) { return $found.FullName }
-  return $null
+    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'skills') }
+  $best = $null
+  $bestVersion = $null
+  foreach ($candidate in $candidates) {
+    $version = (Get-Content (Join-Path $candidate.FullName 'package.json') -Raw | ConvertFrom-Json).version
+    if ($version -eq $RequiredSuperpowersVersion) { return $candidate.FullName }
+    if ($null -eq $bestVersion -or [version]$version -gt [version]$bestVersion) {
+      $best = $candidate.FullName
+      $bestVersion = $version
+    }
+  }
+  # No pinned match: return the newest so the version check can report it clearly.
+  return $best
 }
 
 function Get-WorkingBash {
@@ -57,9 +66,43 @@ Write-Host '[0/6] Backing up managed configuration...'
 $Stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $Backup = Join-Path $OcConfig "backup_$Stamp"
 New-Item -ItemType Directory -Force -Path $Backup | Out-Null
-foreach ($item in @('opencode.jsonc', 'agents', 'commands', 'modes')) {
+foreach ($item in @('opencode.jsonc', 'agents', 'commands')) {
   $source = Join-Path $OcConfig $item
   if (Test-Path -LiteralPath $source) { Copy-Item -LiteralPath $source -Destination (Join-Path $Backup $item) -Recurse -Force }
+}
+# Mode configs are backed up, but the regenerated skill copies and the isolated XDG
+# root are not, to keep backups small.
+$modesSource = Join-Path $OcConfig 'modes'
+if (Test-Path -LiteralPath $modesSource) {
+  $modesTarget = Join-Path $Backup 'modes'
+  New-Item -ItemType Directory -Force -Path $modesTarget | Out-Null
+  Copy-Item -LiteralPath (Join-Path $modesSource '*.ps1') $modesTarget -Force -ErrorAction SilentlyContinue
+  foreach ($mode in @('vanilla', 'stable')) {
+    $source = Join-Path $modesSource $mode
+    if (Test-Path -LiteralPath $source) { Copy-Item -LiteralPath $source -Destination (Join-Path $modesTarget $mode) -Recurse -Force }
+  }
+  $coreSource = Join-Path $modesSource 'core'
+  if (Test-Path -LiteralPath $coreSource) {
+    $coreTarget = Join-Path $modesTarget 'core'
+    New-Item -ItemType Directory -Force -Path $coreTarget | Out-Null
+    foreach ($item in @('opencode.jsonc', 'agents')) {
+      $source = Join-Path $coreSource $item
+      if (Test-Path -LiteralPath $source) { Copy-Item -LiteralPath $source -Destination (Join-Path $coreTarget $item) -Recurse -Force }
+    }
+  }
+}
+# CLI shims and the two mode shortcuts this repository owns.
+$binSource = Join-Path $env:USERPROFILE 'bin'
+if (Test-Path -LiteralPath $binSource) {
+  $binTarget = Join-Path $Backup 'bin'
+  New-Item -ItemType Directory -Force -Path $binTarget | Out-Null
+  Copy-Item -LiteralPath (Join-Path $binSource 'oc-*.cmd') $binTarget -Force -ErrorAction SilentlyContinue
+}
+foreach ($desktop in @((Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'), [Environment]::GetFolderPath('Desktop'))) {
+  foreach ($label in @('OpenCode Vanilla', 'OpenCode Core')) {
+    $source = Join-Path $desktop "$label.lnk"
+    if (Test-Path -LiteralPath $source) { Copy-Item -LiteralPath $source $Backup -Force }
+  }
 }
 Get-ChildItem -Path $OcConfig -Directory -Filter 'backup_*' | Sort-Object Name -Descending | Select-Object -Skip 3 | ForEach-Object {
   Remove-Item -LiteralPath $_.FullName -Recurse -Force
@@ -94,7 +137,7 @@ foreach ($agent in @('stable-lead.md', 'explorer.md', 'implementer.md', 'reviewe
 if (-not (Test-Path (Join-Path $CommandsDir 'stable.md'))) { throw 'Command was not deployed: stable.md' }
 Write-Host '  deployed stable-lead, DeepSeek workers, /stable, /gstack-* commands.'
 
-Write-Host '[3/6] Deploying the three isolated mode directories...'
+Write-Host '[3/6] Deploying the three isolated mode configs and the portable global config...'
 New-Item -ItemType Directory -Force -Path $ModesDir | Out-Null
 foreach ($mode in @('vanilla', 'stable')) {
   $target = Join-Path $ModesDir $mode
@@ -113,6 +156,33 @@ foreach ($script in @('opencode-desktop-common.ps1', 'desktop-vanilla.ps1', 'des
   Copy-Item (Join-Path $RepoRoot "scripts\$script") (Join-Path $ModesDir $script) -Force
 }
 Write-Host "  deployed vanilla, stable, core, and mode launchers under $ModesDir."
+
+# The stock OpenCode shortcut and the stock global config are Stable. Install the
+# portable global config only when none exists; never overwrite the user's own.
+$GlobalConfig = Join-Path $OcConfig 'opencode.jsonc'
+if (-not (Test-Path -LiteralPath $GlobalConfig)) {
+  Copy-Item (Join-Path $RepoRoot 'global\opencode.jsonc') $GlobalConfig
+  Write-Host '  installed global opencode.jsonc (was missing), so the stock shortcut runs Stable.'
+} else {
+  $globalRaw = Get-Content -Raw -LiteralPath $GlobalConfig
+  Write-Warning "  global opencode.jsonc exists; left untouched (file: $GlobalConfig)."
+  if ($globalRaw -notmatch 'superpowers') {
+    Write-Warning '  It does not load the Superpowers plugin. Stable and Vanilla will have no Superpowers skills. Add the plugin entry by hand.'
+  }
+  if ($globalRaw -notmatch '"default_agent"') {
+    Write-Warning '  It sets no default_agent. Add "default_agent": "stable-lead" so the stock shortcut runs Stable.'
+  }
+  if ($globalRaw -match 'opencode-ensemble') {
+    Write-Warning '  It still references @hueyexe/opencode-ensemble. The multi-agent layer is retired; remove that plugin entry by hand.'
+  }
+}
+$GstackConfig = Join-Path $OcConfig 'gstack.jsonc'
+if (-not (Test-Path -LiteralPath $GstackConfig)) {
+  Copy-Item (Join-Path $RepoRoot 'gstack\gstack.jsonc') $GstackConfig
+  Write-Host '  installed gstack.jsonc (was missing).'
+} else {
+  Write-Host '  gstack.jsonc exists; left untouched (diff against repo gstack/ if drifted).'
+}
 
 Write-Host '[4/6] Deploying Core skills from the installed Superpowers package...'
 $superpowers = Get-SuperpowersPackage

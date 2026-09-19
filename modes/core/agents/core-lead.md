@@ -2,6 +2,18 @@
 description: Autonomous Hackathon/MVP lead. Curated Superpowers core, no planning gates, one writer at a time.
 mode: primary
 permission:
+  read:
+    "*": allow
+    "**/.env": deny
+    "**/.env.*": deny
+    "**/secrets/**": deny
+    "**/credentials/**": deny
+    "**/*credentials*": deny
+    "**/*secret*": deny
+    "**/*.pem": deny
+    "**/*.key": deny
+    "**/id_rsa": deny
+    "**/id_ed25519": deny
   skill:
     "*": deny
     test-driven-development: allow

@@ -1,4 +1,4 @@
-param()
+﻿param()
 
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
@@ -99,7 +99,7 @@ foreach ($script in @(
     'scripts\oc-vanilla.ps1', 'scripts\oc-stable.ps1', 'scripts\oc-core.ps1',
     'scripts\oc-vanilla.sh', 'scripts\oc-stable.sh', 'scripts\oc-core.sh',
     'scripts\desktop-vanilla.ps1', 'scripts\desktop-core.ps1',
-    'scripts\opencode-desktop-common.ps1')) {
+    'scripts\opencode-desktop-common.ps1', 'scripts\verify-modes.ps1')) {
   Assert-True (Test-Path -LiteralPath (Join-Path $Root $script)) "missing $script"
 }
 
@@ -148,6 +148,32 @@ Assert-True ($setupWin -match 'the stock OpenCode shortcut was not modified') 'W
 Assert-True ($setupWin -match 'oc-vanilla') 'Windows setup must install the Vanilla CLI launcher'
 Assert-True ($setupWin -match 'oc-stable') 'Windows setup must install the Stable CLI launcher'
 Assert-True ($setupWin -match 'oc-core') 'Windows setup must install the Core CLI launcher'
+# A fresh machine must get a global config, or the stock shortcut has no plugin
+# and no default agent.
+Assert-True ($setupWin -match 'global\\opencode.jsonc') 'Windows setup must install the portable global config when missing'
+Assert-True ($setupUnix -match 'global/opencode.jsonc') 'Unix setup must install the portable global config when missing'
+# The backup must cover the launchers and the shortcuts this repo owns.
+Assert-True ($setupWin -match "oc-\*\.cmd") 'Windows setup must back up the CLI shims'
+Assert-True ($setupWin -match 'OpenCode Vanilla') 'Windows setup must reference the managed shortcuts for backup and cleanup'
+# Real safety check: the stock OpenCode shortcut must be absent from the deletion
+# list. The Write-Host string above is not evidence; this reads the list itself.
+$legacyFilesBlock = [regex]::Match($setupWin, '(?s)\$LegacyFiles = @\(.*?\n\)').Value
+Assert-True ($legacyFilesBlock.Length -gt 0) 'Windows setup must define a retired-artifact deletion list'
+Assert-True ($legacyFilesBlock -notmatch 'OpenCode\.lnk') 'the stock OpenCode shortcut must not be in the deletion list'
+$legacyShortcutBlock = [regex]::Match($setupWin, '(?s)# Shortcuts created by the retired two-mode design.*?\n\}').Value
+Assert-True ($legacyShortcutBlock.Length -gt 0) 'Windows setup must build the retired-shortcut deletion list'
+Assert-True ($legacyShortcutBlock -notmatch "'OpenCode'") 'the stock OpenCode shortcut must not be a deletion label'
+Assert-True ($legacyShortcutBlock -match 'OpenCode PRODUCT') 'the retired PRODUCT shortcut must stay in the deletion list'
+Assert-True ($legacyShortcutBlock -match 'OpenCode TEAM') 'the retired TEAM shortcut must stay in the deletion list'
+Assert-True ($setupUnix -notmatch '\.lnk') 'Unix setup must not reference or delete any shortcut'
+# Version handling must compare against the 6.3.0 pin and fail loudly, never
+# silently fall back to the full plugin.
+Assert-True ($setupWin -match '\$version -ne \$RequiredSuperpowersVersion') 'Windows setup must compare the discovered version against the 6.3.0 pin'
+Assert-True ($setupWin -match 'throw "Superpowers \$version found but \$RequiredSuperpowersVersion is required') 'Windows setup must fail explicitly on a Superpowers version mismatch'
+Assert-True ($setupWin -notmatch '(?i)fall\s?back') 'Windows setup must not silently fall back to the full plugin'
+Assert-True ($setupUnix -match 'VERSION.*REQUIRED_SUPERPOWERS_VERSION') 'Unix setup must compare the discovered version against the 6.3.0 pin'
+Assert-True ($setupUnix -match 'is required') 'Unix setup must fail loudly on a Superpowers version mismatch'
+Assert-True ($setupUnix -notmatch '(?i)fall\s?back') 'Unix setup must not silently fall back to the full plugin'
 
 # --- Shared global configuration and workers ---------------------------------
 

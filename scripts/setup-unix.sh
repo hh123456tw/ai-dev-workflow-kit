@@ -65,6 +65,18 @@ for script in oc-vanilla.sh oc-stable.sh oc-core.sh; do
 done
 echo "  deployed vanilla, stable, core, and mode launchers under $MODES_DIR."
 
+# The stock OpenCode shortcut and the stock global config are Stable. Install the
+# portable global config only when none exists; never overwrite the user's own.
+GLOBAL_CONFIG="$OC_CONFIG/opencode.jsonc"
+if [[ ! -e "$GLOBAL_CONFIG" ]]; then
+  cp "$ROOT/global/opencode.jsonc" "$GLOBAL_CONFIG"
+  echo '  installed global opencode.jsonc (was missing), so the stock shortcut runs Stable.'
+else
+  echo '  global opencode.jsonc exists; left untouched.'
+  grep -q 'superpowers' "$GLOBAL_CONFIG" || echo '  warning: it does not load the Superpowers plugin.' >&2
+  grep -q '"default_agent"' "$GLOBAL_CONFIG" || echo '  warning: it sets no default_agent.' >&2
+fi
+
 printf '[4/6] Deploying Core skills from the installed Superpowers package...\n'
 SUPERPOWERS=""
 for dir in "$HOME"/.cache/opencode/packages/superpowers*; do
@@ -90,6 +102,7 @@ echo "  deployed ${#CORE_SKILLS[@]} Core skills from Superpowers $VERSION."
 printf '[5/6] Installing CLI launchers...\n'
 mkdir -p "$HOME/.local/bin"
 for mode in vanilla stable core; do
+  chmod +x "$MODES_DIR/oc-$mode.sh"
   ln -sf "$MODES_DIR/oc-$mode.sh" "$HOME/.local/bin/oc-$mode"
 done
 echo '  installed oc-vanilla, oc-stable, oc-core. Ensure ~/.local/bin is on PATH.'

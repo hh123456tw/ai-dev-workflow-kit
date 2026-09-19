@@ -23,8 +23,12 @@
 - [ ] Verify `oc-vanilla`, `oc-stable`, and `oc-core` resolve on PATH
 - [ ] Verify the stock OpenCode shortcut still opens Stable and was not modified
 - [ ] Verify the `OpenCode Vanilla` and `OpenCode Core` shortcuts exist
-- [ ] Launch all three Desktop instances and confirm they coexist with distinct
-      `user-data-dir` values
+- [ ] Confirm the Desktop single-instance limitation: with one Desktop instance
+      running, launching another exits immediately. Only one Desktop instance runs
+      at a time, so close it before switching modes. The CLI launchers are
+      unaffected and can run concurrently.
+- [ ] Confirm the global `opencode.jsonc` still sets `"default_agent":
+      "stable-lead"` so the stock shortcut runs Stable
 - [ ] Run one headless smoke task per mode and confirm public and hidden
       acceptance pass
 - [ ] Confirm Core produces no planning or SDD artifacts

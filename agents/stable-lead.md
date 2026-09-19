@@ -2,6 +2,18 @@
 description: Primary lead with Superpowers methodology. Single workflow that scales automatically from production-grade work to time-boxed MVP delivery. One writer at a time.
 mode: primary
 permission:
+  read:
+    "*": allow
+    "**/.env": deny
+    "**/.env.*": deny
+    "**/secrets/**": deny
+    "**/credentials/**": deny
+    "**/*credentials*": deny
+    "**/*secret*": deny
+    "**/*.pem": deny
+    "**/*.key": deny
+    "**/id_rsa": deny
+    "**/id_ed25519": deny
   skill:
     "*": allow
     grill-me: deny

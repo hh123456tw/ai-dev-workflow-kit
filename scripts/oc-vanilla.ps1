@@ -8,5 +8,8 @@ if (-not (Test-Path -LiteralPath $config)) {
 $env:OPENCODE_CONFIG = $config
 Remove-Item Env:OPENCODE_CONFIG_DIR -ErrorAction SilentlyContinue
 Remove-Item Env:OPENCODE_CONFIG_CONTENT -ErrorAction SilentlyContinue
+Remove-Item Env:OPENCODE_DISABLE_EXTERNAL_SKILLS -ErrorAction SilentlyContinue
+Remove-Item Env:OPENCODE_DISABLE_DEFAULT_PLUGINS -ErrorAction SilentlyContinue
+# Vanilla inherits the global config directory; only Core uses an isolated config root.
 & opencode @args
 exit $LASTEXITCODE

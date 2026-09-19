@@ -48,11 +48,13 @@ from being read into Core. Verified with `opencode debug config` and
 
 ## Limits
 
-- Session history is separate per mode.
-- `opencode://` deep links may route only to the stock Stable instance.
-- Running three instances consumes more memory.
-- An OpenCode Desktop update can change Electron launch behavior. Re-run setup
-  and re-verify if a shortcut stops isolating correctly.
+- Session history is separate per mode, because each mode uses its own user-data
+  directory whenever it is the running instance.
+- `opencode://` deep links route to whichever instance is currently running.
+- Launcher failures are written to `%LOCALAPPDATA%\OpenCode\mode-launcher.log` and
+  shown in a message box, because the shortcuts run PowerShell hidden.
+- An OpenCode Desktop update can change Electron launch behavior. Re-run setup and
+  re-verify if a shortcut stops isolating correctly.
 
 ## Rebuild
 
@@ -64,8 +66,9 @@ from being read into Core. Verified with `opencode debug config` and
 ## Remove stale deployed artifacts
 
 Earlier generations deployed a multi-agent Team workflow, a product profile, and
-an `oc-product` wrapper. Setup lists them; `-CleanLegacy` removes the ones inside
-the config directory. The `oc-product` wrapper outside it must be removed by hand.
+an `oc-product` wrapper. Setup lists them, and `-CleanLegacy` removes them,
+including the `oc-product` shims in `~/bin` and `%APPDATA%\npm` and the retired
+`OpenCode PRODUCT` / `OpenCode TEAM` shortcuts.
 
 ## UI/TUI preferences
 
