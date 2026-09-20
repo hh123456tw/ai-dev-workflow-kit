@@ -89,6 +89,14 @@ def flat(content: str) -> str:
     return re.sub(r"\s+", " ", content)
 
 
+def permission_section(content: str, key: str) -> str:
+    match = re.search(
+        rf"(?m)^  {key}:\r?\n((?:    \S.*(?:\r?\n|$))+)",
+        content,
+    )
+    return match.group(1) if match else ""
+
+
 class ThreeModeBundleTest(unittest.TestCase):
     def read_text(self, relative: str) -> str:
         return (ROOT / relative).read_text(encoding="utf-8")
@@ -323,6 +331,21 @@ class ThreeModeBundleTest(unittest.TestCase):
         )
         self.assertNotRegex(unix, re.compile(r"(?i)fall\s?back"))
 
+        # gstack routing is shared and portable, so a fresh machine must get the
+        # config and an existing one must be left untouched. Read the install block
+        # itself, so deleting it fails the suite instead of leaving a path string.
+        unix_gstack = re.search(r"(?s)# gstack routing is shared.*?\nfi", unix)
+        assert unix_gstack is not None
+        unix_gstack_block = unix_gstack.group(0)
+        self.assertIn('[[ ! -e "$GSTACK_CONFIG" ]]', unix_gstack_block)
+        self.assertIn('cp "$ROOT/gstack/gstack.jsonc" "$GSTACK_CONFIG"', unix_gstack_block)
+        self.assertIn("left untouched", unix_gstack_block)
+        self.assertRegex(
+            win,
+            re.compile(r"Copy-Item \(Join-Path \$RepoRoot 'gstack\\gstack\.jsonc'\)"),
+        )
+        self.assertIn("gstack.jsonc exists; left untouched", win)
+
     def test_core_manifest_records_pinned_version_and_six_skills(self) -> None:
         # The deployed manifest is git-ignored, so validate the shape the setup
         # scripts generate: the pinned version plus exactly the six Core skills.
@@ -393,6 +416,41 @@ class ThreeModeBundleTest(unittest.TestCase):
             self.assertRegex(workers[name], re.compile(r"(?m)^  edit: deny\s*$"), name)
         self.assertRegex(
             workers["implementer"], re.compile(r"(?m)^## Completion handback\s*$")
+        )
+
+        # Restore the worker assertions dropped in the refactor: the rules still
+        # exist in the agent files, but nothing would catch future drift.
+        implementer = workers["implementer"]
+        for denial in (
+            "git push*",
+            "git commit*",
+            "git merge*",
+            "git rebase*",
+            "git reset --hard*",
+            "git clean*",
+            "git branch -D*",
+            "rm -rf*",
+        ):
+            self.assertRegex(
+                implementer,
+                re.compile(rf'(?m)^    "{re.escape(denial)}": deny\s*$'),
+                denial,
+            )
+        for bullet in (
+            "- Changed files",
+            "- Commands run and exact result",
+            "- Core acceptance result",
+            "- Remaining limitation or blocker",
+        ):
+            self.assertRegex(
+                implementer,
+                re.compile(rf"(?m)^{re.escape(bullet)}\s*$"),
+                bullet,
+            )
+        test_writer_edit = permission_section(workers["test-writer"], "edit")
+        self.assertRegex(test_writer_edit, re.compile(r'(?m)^    "\*": deny\s*$'))
+        self.assertRegex(
+            test_writer_edit, re.compile(r'(?m)^    "\*\*/tests/\*\*": allow\s*$')
         )
 
     def test_documentation_covers_three_modes(self) -> None:

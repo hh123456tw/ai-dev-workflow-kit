@@ -186,6 +186,16 @@ Assert-True ($setupWin -match 'oc-core') 'Windows setup must install the Core CL
 # and no default agent.
 Assert-True ($setupWin -match 'global\\opencode.jsonc') 'Windows setup must install the portable global config when missing'
 Assert-True ($setupUnix -match 'global/opencode.jsonc') 'Unix setup must install the portable global config when missing'
+# gstack routing is shared and portable, so a fresh machine must get the config and
+# an existing one must be left untouched. Read the install block itself, so deleting
+# it fails the suite instead of leaving a bare path string behind.
+$unixGstackBlock = [regex]::Match($setupUnix, '(?s)# gstack routing is shared.*?\nfi').Value
+Assert-True ($unixGstackBlock.Length -gt 0) 'Unix setup must define a gstack config installation block'
+Assert-True ($unixGstackBlock -match '\[\[ ! -e "\$GSTACK_CONFIG" \]\]') 'Unix setup must install gstack.jsonc only when it is missing'
+Assert-True ($unixGstackBlock -match 'cp "\$ROOT/gstack/gstack\.jsonc" "\$GSTACK_CONFIG"') 'Unix setup must copy the portable gstack.jsonc when missing'
+Assert-True ($unixGstackBlock -match 'left untouched') 'Unix setup must leave an existing gstack.jsonc untouched'
+Assert-True ($setupWin -match 'Copy-Item \(Join-Path \$RepoRoot ''gstack\\gstack\.jsonc''\)') 'Windows setup must install the portable gstack config when missing'
+Assert-True ($setupWin -match 'gstack\.jsonc exists; left untouched') 'Windows setup must leave an existing gstack.jsonc untouched'
 # The backup must cover the launchers and the shortcuts this repo owns. Matching
 # the bare string "oc-*.cmd" is not evidence: the old code passed the wildcard to
 # -LiteralPath and swallowed the resulting failure, so nothing was copied. Read the
@@ -255,6 +265,19 @@ foreach ($readOnly in @('explorer', 'reviewer')) {
   Assert-True ($workers[$readOnly] -match '(?m)^  edit: deny\s*$') "$readOnly must be read-only"
 }
 Assert-True ($workers['implementer'] -match '(?m)^## Completion handback\s*$') 'implementer must use the exact Completion handback heading'
+
+# Restore the worker assertions dropped in the refactor: the rules still exist in
+# the agent files, but nothing would catch future drift.
+$implementer = $workers['implementer']
+foreach ($denial in @('git push*', 'git commit*', 'git merge*', 'git rebase*', 'git reset --hard*', 'git clean*', 'git branch -D*', 'rm -rf*')) {
+  Assert-True ($implementer -match ('(?m)^    "' + [regex]::Escape($denial) + '": deny\s*$')) "implementer must deny the bash command $denial"
+}
+foreach ($bullet in @('- Changed files', '- Commands run and exact result', '- Core acceptance result', '- Remaining limitation or blocker')) {
+  Assert-True ($implementer -match ('(?m)^' + [regex]::Escape($bullet) + '\s*$')) "implementer handback must include '$bullet'"
+}
+$testWriterEdit = Get-PermissionSection $workers['test-writer'] 'edit'
+Assert-True ($testWriterEdit -match '(?m)^    "\*": deny\s*$') 'test-writer edit section must deny by default'
+Assert-True ($testWriterEdit -match '(?m)^    "\*\*/tests/\*\*": allow\s*$') 'test-writer edit section must allow **/tests/**'
 
 # The binding requirement denies credential paths in every agent, including both
 # primary agents. Only the four workers were covered before.

@@ -74,13 +74,30 @@ printf '[0/6] Backing up managed configuration...\n'
 STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP="$OC_CONFIG/backup_$STAMP"
 mkdir -p "$BACKUP"
-for item in opencode.jsonc agents commands modes; do
+for item in opencode.jsonc agents commands; do
   # Copy only when the source exists; a genuine copy failure must surface rather
   # than being swallowed by an `|| true` arm.
   if [[ -e "$OC_CONFIG/$item" ]]; then
     cp -R "$OC_CONFIG/$item" "$BACKUP/"
   fi
 done
+# Mode configs are backed up, but the regenerated skill copies and the isolated XDG
+# root are not, to keep backups small. This mirrors the Windows backup scope.
+if [[ -d "$OC_CONFIG/modes" ]]; then
+  mkdir -p "$BACKUP/modes"
+  for launcher in "$OC_CONFIG"/modes/*.sh; do
+    if [[ -e "$launcher" ]]; then cp "$launcher" "$BACKUP/modes/"; fi
+  done
+  for mode in vanilla stable; do
+    if [[ -e "$OC_CONFIG/modes/$mode" ]]; then cp -R "$OC_CONFIG/modes/$mode" "$BACKUP/modes/"; fi
+  done
+  if [[ -d "$OC_CONFIG/modes/core" ]]; then
+    mkdir -p "$BACKUP/modes/core"
+    for item in opencode.jsonc agents; do
+      if [[ -e "$OC_CONFIG/modes/core/$item" ]]; then cp -R "$OC_CONFIG/modes/core/$item" "$BACKUP/modes/core/"; fi
+    done
+  fi
+fi
 i=0
 for d in $(ls -d "$OC_CONFIG"/backup_* 2>/dev/null | sort -r); do
   i=$((i + 1))
@@ -134,6 +151,16 @@ else
   grep -q '"default_agent"' "$GLOBAL_CONFIG" || echo '  warning: it sets no default_agent.' >&2
 fi
 
+# gstack routing is shared by every mode. Install the portable config only when
+# none exists; never overwrite the user's own.
+GSTACK_CONFIG="$OC_CONFIG/gstack.jsonc"
+if [[ ! -e "$GSTACK_CONFIG" ]]; then
+  cp "$ROOT/gstack/gstack.jsonc" "$GSTACK_CONFIG"
+  echo '  installed gstack.jsonc (was missing).'
+else
+  echo '  gstack.jsonc exists; left untouched (diff against repo gstack/ if drifted).'
+fi
+
 printf '[4/6] Deploying Core skills from the installed Superpowers package...\n'
 SUPERPOWERS="$(find_superpowers_package)"
 [[ -n "$SUPERPOWERS" ]] || { echo 'Superpowers package not found under ~/.cache/opencode/packages. Launch OpenCode once in Stable so the plugin installs, then re-run setup.' >&2; exit 1; }
@@ -149,7 +176,7 @@ done
   printf '{\n  "superpowers_version": "%s",\n  "skills": [' "$VERSION"
   printf '"%s"' "${CORE_SKILLS[0]}"
   for skill in "${CORE_SKILLS[@]:1}"; do printf ', "%s"' "$skill"; done
-  printf '],\n  "deployed_at": "%s"\n}\n' "$(date -Iseconds)"
+  printf '],\n  "deployed_at": "%s"\n}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > "$CORE_DIR/skills/manifest.json"
 echo "  deployed ${#CORE_SKILLS[@]} Core skills from Superpowers $VERSION."
 

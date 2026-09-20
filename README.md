@@ -1,6 +1,6 @@
 # OpenCode 三模式工作流工具組
 
-可攜的 OpenCode 設定，提供**三套互相隔離**的開發模式。本 repository 只保存設定與還原腳本；憑證、OAuth 狀態、快取及第三方框架原始碼都留在本機。新電腦 clone 之後是**兩步**：先跑一次 setup 讓 plugin 被宣告，在 Stable 啟動一次 OpenCode 讓 Superpowers plugin 安裝，再跑一次 setup 部署 Core skills（剩下只需 `opencode auth login`）。
+可攜的 OpenCode 設定，提供**三套互相隔離**的開發模式。本 repository 只保存設定與還原腳本；憑證、OAuth 狀態、快取及第三方框架原始碼都留在本機。新電腦 clone 之後是**三步**：先跑一次 setup 讓 plugin 被宣告，在 Stable 啟動一次 OpenCode 讓 Superpowers plugin 安裝，再跑一次 setup 部署 Core skills（剩下只需 `opencode auth login`）。
 
 ## 三種模式
 

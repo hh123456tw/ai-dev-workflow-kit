@@ -40,7 +40,7 @@
 2. Setup backup covers CLI shims and the two managed shortcuts, and excludes the isolated XDG root.
 3. Setup version discovery prefers the pinned `6.3.0` and otherwise returns the newest for a clear error.
 4. `agents/stable-lead.md` and `modes/core/agents/core-lead.md` deny credential-path reads.
-5. `oc-vanilla` and `oc-stable` (both PowerShell and Bash) clear `OPENCODE_DISABLE_EXTERNAL_SKILLS`, `OPENCODE_DISABLE_DEFAULT_PLUGINS`, and `XDG_CONFIG_HOME`.
+5. `oc-vanilla` and `oc-stable` (both PowerShell and Bash) clear `OPENCODE_DISABLE_EXTERNAL_SKILLS` and `OPENCODE_DISABLE_DEFAULT_PLUGINS`. They deliberately do **not** clear or set `XDG_CONFIG_HOME`: it is a legitimate user configuration choice, not a Core-only isolation flag, and the tests forbid naming it in those launchers.
 6. Desktop wrappers log failures to `%LOCALAPPDATA%\OpenCode\mode-launcher.log` and show a message box instead of failing silently.
 7. `scripts/verify-modes.ps1` performs runtime isolation checks instead of grepping launcher text.
 8. `docs/restore-checklist.md`, `desktop/opencode/README.md`, `README.md`, and `AGENTS.md` state the Desktop single-instance limitation instead of claiming concurrent instances.

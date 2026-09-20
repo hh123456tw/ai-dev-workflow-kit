@@ -15,9 +15,10 @@ Three independent Desktop entries:
 The stock shortcut is created by the OpenCode installer and is never modified by
 this repository. Setup only adds the two new shortcuts.
 
-All three use a distinct `--user-data-dir`, which separates UI state and the
-session database per mode. Provider authentication is shared because the data and
-auth paths are not changed.
+The stock Stable shortcut passes no `--user-data-dir` and uses the app default.
+The Vanilla and Core wrappers each pass a distinct `--user-data-dir`, which
+separates UI state and the session database per mode. Provider authentication is
+shared because the data and auth paths are not changed.
 
 **Verified limitation: only one Desktop instance at a time.** On OpenCode Desktop
 1.18.31, launching a second instance with a different `--user-data-dir` exits

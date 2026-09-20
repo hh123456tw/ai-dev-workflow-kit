@@ -1,3 +1,9 @@
+> **Superseded.** This document is retained as history. It was superseded by
+> [`2026-09-19-three-mode-opencode-workflows-design.md`](2026-09-19-three-mode-opencode-workflows-design.md),
+> which replaces the single workflow with the Vanilla, Stable, and Core modes.
+> Its references to `profiles/product` and `oc-product` describe a retired entry
+> surface and are no longer accurate.
+
 # Single Workflow Design
 
 **Date:** 2026-09-18

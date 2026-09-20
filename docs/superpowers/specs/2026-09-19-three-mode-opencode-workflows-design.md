@@ -97,7 +97,8 @@ Shared bounded workers remain the source files under `agents/`. Setup deploys co
 - Same primary and worker models.
 - Default agent: `core-lead`.
 - No Superpowers plugin/bootstrap.
-- Loads exactly six selected skills:
+- Loads six curated skills (OpenCode's own built-in skills, such as
+  `customize-opencode`, are not part of that count):
   - `test-driven-development`
   - `systematic-debugging`
   - `verification-before-completion`
@@ -175,8 +176,11 @@ removes OpenCode's built-in provider plugins, including the OpenAI provider, so
 `ProviderModelNotFoundError`. The isolated config dir and `XDG_CONFIG_HOME` already
 exclude the Superpowers plugin (the Desktop wrapper does not pass `--pure`, because
 Electron does not forward it to the OpenCode sidecar), so the default provider
-plugins must stay enabled for the pinned model to load. Vanilla and Stable clear
-the variable so a value exported by a parent shell cannot leak into them.
+plugins must stay enabled for the pinned model to load. The wrapped Vanilla and
+Stable launchers (`oc-vanilla`, `oc-stable`, and the Vanilla Desktop wrapper)
+clear the variable so a value exported by a parent shell cannot leak into them.
+The stock Stable shortcut has no wrapper, so it inherits the parent environment
+unchanged; a value exported by the parent shell could still reach it.
 
 Provider authentication remains shared because the data/auth path is not changed.
 
