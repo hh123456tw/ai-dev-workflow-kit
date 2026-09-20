@@ -188,7 +188,8 @@ Expected characteristics:
 - No shared schema/state/public contract/security surface.
 - Mechanical implementation, tests, UI styling, mocks, seeds, adapters, local refactor, or reproducible bug.
 
-Execution: DeepSeek V4 Flash, normal verification, DeepSeek reviewer when non-trivial.
+Execution: DeepSeek V4 Flash, normal verification, and the named read-only reviewer
+when the active Core deadline-aware gate requires it.
 
 ### Tier B — Guarded
 

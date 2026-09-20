@@ -35,6 +35,13 @@ function Get-Flat([string]$Content) {
   return ($Content -replace '\s+', ' ')
 }
 
+function Get-Section([string]$Content, [string]$Heading) {
+  $pattern = '(?ms)^## ' + [regex]::Escape($Heading) + '\s*$(.*?)(?=^## |\Z)'
+  $match = [regex]::Match($Content, $pattern)
+  if ($match.Success) { return $match.Groups[1].Value }
+  return ''
+}
+
 function Assert-CoreClearsDefaultPlugins([string]$Content, [string]$Label) {
   # Core must actively clear an inherited OPENCODE_DISABLE_DEFAULT_PLUGINS and
   # must never assign it on: default provider plugins are required to resolve
@@ -61,6 +68,7 @@ $legacyWorkflow = '(?i)matt\s+pocock|grill|to-spec|to-tickets|wayfinder|\bDAG\b|
 $vanilla = Read-Json 'modes\vanilla\opencode.jsonc'
 $stable = Read-Json 'modes\stable\opencode.jsonc'
 $core = Read-Json 'modes\core\opencode.jsonc'
+$coreCodeGraph = Read-Json 'modes\core\opencode-codegraph.jsonc'
 
 Assert-True ($vanilla.default_agent -eq 'build') 'Vanilla must default to the upstream build agent'
 Assert-True ($stable.default_agent -eq 'stable-lead') 'Stable must default to stable-lead'
@@ -77,6 +85,11 @@ Assert-True (@($vanilla.plugin) -contains $superpowersSpec) 'Vanilla must load f
 Assert-True (@($stable.plugin) -contains $superpowersSpec) 'Stable must load full Superpowers'
 Assert-True ($null -eq $core.plugin) 'Core must not declare any plugin'
 Assert-True ($core.subagent_depth -eq 1) 'Core must limit subagent depth to 1'
+Assert-True ($null -eq $core.mcp) 'Core control must not load CodeGraph or another MCP'
+Assert-True ($coreCodeGraph.default_agent -eq 'core-lead') 'CodeGraph canary must keep core-lead'
+Assert-True ($coreCodeGraph.mcp.codegraph.type -eq 'local') 'CodeGraph canary must use a local MCP'
+Assert-True ($coreCodeGraph.mcp.codegraph.command[0] -match 'v0\.20\.1') 'CodeGraph canary must pin version 0.20.1'
+Assert-True (($coreCodeGraph.mcp.codegraph.command -join ' ') -match '--mcp --profile=core') 'CodeGraph canary must expose only the upstream core tool profile'
 
 # Core skills are deployed from the installed package, never vendored
 $gitignore = Read-Text '.gitignore'
@@ -103,10 +116,72 @@ foreach ($skill in $heavySkills) {
 }
 Assert-True ($coreLead -match '(?m)^    "\*": deny\s*$') 'core-lead must deny unlisted skills by default'
 
+# --- Core completion gate and real-path evidence ------------------------------
+# Baseline finding: every valid run claimed completion before a required check
+# passed, and one run shipped with its reviewer dispatch denied. An unavailable
+# reviewer must block completion, not silently pass it. A second finding: Core
+# verified a "<20% warm time" criterion with a synthetic counter while the measured
+# real ratio was 0.335 (false green). These are static policy-content checks; the
+# Phase 3 revalidation measures whether a live model obeys them.
+
+$completionGate = Get-Flat (Get-Section $coreLead 'Completion gate')
+Assert-True ($completionGate.Length -gt 0) 'core-lead must define a Completion gate section'
+foreach ($field in @('deadline mode', 'changed-file count', 'file classifications', 'risk flags', 'exact result and exit codes', 'acceptance coverage', 'reviewer status', 'scope statement', 'blocked condition')) {
+  Assert-True ($completionGate -match [regex]::Escape($field)) "core-lead Completion gate must require the '$field' field"
+}
+Assert-True ($completionGate -match 'verification_blocked') 'core-lead must mark an unavailable reviewer as verification_blocked'
+Assert-True ($completionGate -match 'do not claim done') 'core-lead must not claim done when the gate is unmet'
+Assert-True ($completionGate -match 'instead of claiming done') 'core-lead must report incomplete instead of claiming done'
+Assert-True ($completionGate -match 're-verify before completion') 'core-lead must re-verify resolved findings before completion'
+# Polarity-aware: the copula is asserted, so negating the rule fails.
+Assert-True ($completionGate -match [regex]::Escape('dispatch that fails, is denied, times out, or returns no result is a `verification_blocked` outcome')) 'core-lead must map an unavailable reviewer dispatch to verification_blocked'
+Assert-True ($completionGate -match 'reviewer tool is unavailable') 'core-lead must block when the reviewer tool is unavailable before dispatch'
+Assert-True ($completionGate -match 'Never treat an unperformed review as a passed review') 'core-lead must never treat an unperformed review as passed'
+Assert-True ($completionGate -match [regex]::Escape('never record a required review as "not required"')) 'core-lead must not allow a required review to be recorded as not required'
+
+$reviewSection = Get-Flat (Get-Section $coreLead 'Review')
+Assert-True ($reviewSection.Length -gt 0) 'core-lead must define a Review section'
+Assert-True ($coreLead -match '(?m)^    reviewer: allow$') 'core-lead must keep reviewer task permission available'
+foreach ($phrase in @('Build: review is required when a change touches two or more production files', 'Feature Freeze: review is required only when a change touches two or more production files and at least one', 'Demo Survival: review is required only when a change touches two or more production files and at least one', 'Production files are tracked files outside tests, documentation, fixtures, examples, and generated output', 'Runtime configuration and package manifests count as production', 'classify every changed file', 'record every risk flag as true or false with affected paths', 'demo_path', 'cross_module', 'concurrency', 'shared_state', 'external_api', 'external_integration', 'demo_blocking_cross_module_crash', 'review_not_required', '`reviewer` subagent', '`explorer` is not a substitute', 'not your judgment', 'authoritative for what they cover', 'not sufficient for completion', 'gets a regression test when the correction changes behavior')) {
+  Assert-True ($reviewSection -match [regex]::Escape($phrase)) "core-lead Review must state '$phrase'"
+}
+Assert-True ($reviewSection -match [regex]::Escape('Feature Freeze: review is required only when a change touches two or more production files and at least one of these flags is true: `demo_path`, `cross_module`, `concurrency`, `shared_state`, or `external_api`')) 'core-lead must preserve the exact Feature Freeze risk mapping'
+Assert-True ($reviewSection -match [regex]::Escape('Demo Survival: review is required only when a change touches two or more production files and at least one of these flags is true: `concurrency`, `shared_state`, `external_integration`, or `demo_blocking_cross_module_crash`')) 'core-lead must preserve the exact Demo Survival risk mapping'
+$deadlineSection = Get-Flat (Get-Section $coreLead 'Deadline awareness')
+Assert-True ($deadlineSection -match [regex]::Escape('Never invent a deadline; with none stated, use Build discipline and say so')) 'core-lead must default to Build when no deadline is supplied'
+
+$realPathEvidence = Get-Flat (Get-Section $coreLead 'Real-path evidence')
+Assert-True ($realPathEvidence.Length -gt 0) 'core-lead must define a Real-path evidence section'
+Assert-True ($realPathEvidence -match [regex]::Escape('Do not use a mocked clock, a synthetic counter, implementation internals, or a self-authored substitute metric as evidence')) 'core-lead must prohibit substitute metrics as real-world evidence'
+foreach ($phrase in @('real command, API, or execution path', 'substitute metric', 'fixture or input size', 'threshold', 'observed value', 'exit code')) {
+  Assert-True ($realPathEvidence -match [regex]::Escape($phrase)) "core-lead Real-path evidence must mention '$phrase'"
+}
+
+$coreBehavior = Get-Flat (Get-Section (Read-Text 'AGENTS.md') 'Core behavior')
+Assert-True ($coreBehavior.Length -gt 0) 'AGENTS.md must define a Core behavior section'
+foreach ($phrase in @('completion receipt', 'verification_blocked', 'deadline mode', 'Feature Freeze', 'Demo Survival', 'demo_path', 'demo_blocking_cross_module_crash', 'Classify every changed file', '`explorer` is not a substitute')) {
+  Assert-True ($coreBehavior -match [regex]::Escape($phrase)) "AGENTS.md Core behavior must state '$phrase'"
+}
+
+$readmeCore = Get-Flat (Get-Section (Read-Text 'README.md') 'Core 的行為')
+Assert-True ($readmeCore -match [regex]::Escape('`explorer` 不可替代')) 'README Core behavior must forbid explorer substitution'
+Assert-True ($readmeCore -match 'completion receipt') 'README Core behavior must document the completion receipt'
+Assert-True ($readmeCore -match 'Demo Survival') 'README Core behavior must document the Demo Survival review gate'
+Assert-True ($readmeCore -match 'demo_path') 'README Core behavior must name the Feature Freeze risk flags'
+Assert-True ($readmeCore -match 'demo_blocking_cross_module_crash') 'README Core behavior must name the Demo Survival risk flags'
+
+$reviewerBlockedSmoke = Read-Text 'scripts\smoke-core-reviewer-blocked.ps1'
+foreach ($phrase in @('[IO.Path]::GetTempPath()', 'reviewer: allow', 'reviewer: deny', 'OPENCODE_CONFIG_DIR', 'Remove-Item Env:OPENCODE_CONFIG_CONTENT', 'Remove-Item Env:OPENCODE_DISABLE_DEFAULT_PLUGINS', '--pure', '--auto', 'verification_blocked', 'CORE_REVIEWER_BLOCKED_SMOKE_PASS', 'CORE_REVIEWER_BLOCKED_SELFTEST_PASS', 'final_answer', 'TaskEvents', 'NestedOpenCodeCommands', 'positive completion claim', '-SelfTest', 'finally', 'two or more production files')) {
+  Assert-True ($reviewerBlockedSmoke -match [regex]::Escape($phrase)) "reviewer-blocked smoke must state '$phrase'"
+}
+$smokeSelfTestOutput = & pwsh -NoProfile -File (Join-Path $Root 'scripts\smoke-core-reviewer-blocked.ps1') -SelfTest 2>&1 | Out-String
+Assert-True ($LASTEXITCODE -eq 0) "reviewer-blocked offline self-test must exit 0: $smokeSelfTestOutput"
+Assert-True ($smokeSelfTestOutput -match 'CORE_REVIEWER_BLOCKED_SELFTEST_PASS') 'reviewer-blocked offline self-test must pass'
+
 # --- Launchers and Desktop wrappers ------------------------------------------
 
 foreach ($script in @(
-    'scripts\oc-vanilla.ps1', 'scripts\oc-stable.ps1', 'scripts\oc-core.ps1',
+    'scripts\oc-vanilla.ps1', 'scripts\oc-stable.ps1', 'scripts\oc-core.ps1', 'scripts\oc-core-codegraph.ps1',
     'scripts\oc-vanilla.sh', 'scripts\oc-stable.sh', 'scripts\oc-core.sh',
     'scripts\desktop-vanilla.ps1', 'scripts\desktop-core.ps1',
     'scripts\opencode-desktop-common.ps1', 'scripts\verify-modes.ps1')) {
@@ -119,6 +194,37 @@ Assert-True ($coreLauncher -match 'XDG_CONFIG_HOME') 'Core launcher must isolate
 Assert-True ($coreLauncher -match 'OPENCODE_CONFIG_DIR') 'Core launcher must isolate OPENCODE_CONFIG_DIR'
 Assert-True ($coreLauncher -match 'OPENCODE_DISABLE_EXTERNAL_SKILLS') 'Core launcher must disable external skills'
 Assert-CoreClearsDefaultPlugins $coreLauncher 'Core launcher'
+
+$codeGraphLauncher = Read-Text 'scripts\oc-core-codegraph.ps1'
+$codeGraphInstaller = Read-Text 'scripts\install-codegraph-windows.ps1'
+foreach ($hash in @(
+    'aa1b6108217c119af6ac444b8652a0eadcfe2c343bff78ead2edd15b6b7b15b1',
+    '52f8ebe8f08f369a44fed6d1cb680c7c89169795e1c2949ee25b88b538ef0948')) {
+  Assert-True ($codeGraphLauncher -match $hash) "CodeGraph launcher must enforce pinned hash $hash"
+  Assert-True ($codeGraphInstaller -match $hash) "CodeGraph installer and launcher must share pinned hash $hash"
+}
+Assert-CoreClearsDefaultPlugins $codeGraphLauncher 'Core CodeGraph launcher'
+
+$canaryRoot = Join-Path ([IO.Path]::GetTempPath()) ("opencode-codegraph-launcher-test-" + [guid]::NewGuid().ToString('N'))
+$originalUserProfile = $env:USERPROFILE
+try {
+  $canaryMode = Join-Path $canaryRoot '.config\opencode\modes\core'
+  New-Item -ItemType Directory -Force -Path (Join-Path $canaryMode 'skills\test-driven-development') | Out-Null
+  [IO.File]::WriteAllText((Join-Path $canaryMode 'opencode-codegraph.jsonc'), '{}')
+  $env:USERPROFILE = $canaryRoot
+  $missingOutput = & pwsh -NoProfile -File (Join-Path $Root 'scripts\oc-core-codegraph.ps1') 2>&1 | Out-String
+  Assert-True ($LASTEXITCODE -ne 0 -and $missingOutput -match 'Pinned CodeGraph 0\.20\.1 is missing') 'CodeGraph launcher must fail clearly when the pinned binary is missing'
+
+  $fakeEngineDir = Join-Path $canaryRoot '.codegraph\bin\v0.20.1'
+  New-Item -ItemType Directory -Force -Path $fakeEngineDir | Out-Null
+  [IO.File]::WriteAllText((Join-Path $fakeEngineDir 'codegraph-server-win32-x64.exe'), 'tampered')
+  [IO.File]::WriteAllText((Join-Path $fakeEngineDir 'onnxruntime.dll'), 'tampered')
+  $tamperedOutput = & pwsh -NoProfile -File (Join-Path $Root 'scripts\oc-core-codegraph.ps1') 2>&1 | Out-String
+  Assert-True ($LASTEXITCODE -ne 0 -and $tamperedOutput -match 'checksum mismatch') 'CodeGraph launcher must fail clearly when the pinned binary is tampered'
+} finally {
+  $env:USERPROFILE = $originalUserProfile
+  if (Test-Path -LiteralPath $canaryRoot) { Remove-Item -LiteralPath $canaryRoot -Recurse -Force }
+}
 
 $coreLauncherSh = Read-Text 'scripts\oc-core.sh'
 Assert-True ($coreLauncherSh -match '--pure') 'Core shell launcher must run OpenCode in pure mode'
@@ -306,6 +412,7 @@ Assert-True ($agentsDoc -match 'Core') 'AGENTS.md must describe the Core mode'
 $spec = Read-Text 'docs\superpowers\specs\2026-09-19-three-mode-opencode-workflows-design.md'
 Assert-True ($spec -match 'Three-Mode OpenCode Workflows Design') 'the three-mode design spec must exist'
 Assert-True ($spec -match 'Verified limitation: one Desktop instance at a time') 'the spec must record the verified Desktop single-instance limitation'
+Assert-True ($spec -match 'deadline-aware read-only reviewer gate') 'the spec must record the deadline-aware Core reviewer gate'
 
 # Regression guard: the design must not re-claim concurrent Desktop instances.
 $readmeText = Read-Text 'README.md'

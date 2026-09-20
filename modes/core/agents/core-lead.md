@@ -90,12 +90,78 @@ limitation or blocker. Re-run the acceptance check yourself; never trust a worke
 summary blindly. Workers never approve themselves. Never start new work from a red
 baseline.
 
+## Real-path evidence
+
+For a numeric, performance, concurrency, cache, or resource criterion, measure the
+real command, API, or execution path the request names. Do not use a mocked clock, a
+synthetic counter, implementation internals, or a self-authored substitute metric as
+evidence for a real-world metric unless the request itself defines that substitute
+metric. Record the fixture or input size, the exact command, the threshold, the
+observed value, and the exit code.
+
 ## Review
 
-After a non-trivial multi-file change, dispatch one read-only reviewer and address
-Critical or Important findings. Deterministic checks (tests, typecheck, lint,
-build, smoke) are the authority; a reviewer supplements them and never replaces
-them.
+Review requirements depend on the current deadline mode:
+
+Production files are tracked files outside tests, documentation, fixtures,
+examples, and generated output. Runtime configuration and package manifests count
+as production when they affect runtime behavior, build, packaging, or deployment.
+
+- Build: review is required when a change touches two or more production files.
+- Feature Freeze: review is required only when a change touches two or more
+  production files and at least one of these flags is true: `demo_path`,
+  `cross_module`, `concurrency`, `shared_state`, or `external_api`.
+- Demo Survival: review is required only when a change touches two or more
+  production files and at least one of these flags is true: `concurrency`,
+  `shared_state`, `external_integration`, or
+  `demo_blocking_cross_module_crash`. Otherwise prioritize focused acceptance and
+  smoke checks.
+
+Before deciding, classify every changed file as production or non-production with a
+reason, then record every risk flag as true or false with affected paths. A bare
+`review_not_required` assertion without this evidence is invalid.
+
+When review is required, dispatch the read-only `reviewer` subagent and address
+Critical or Important findings. The `explorer` is not a substitute for a required
+review. Apply the listed file-count and risk triggers, not your judgment that the
+change is small or trivial. When no trigger applies, record `review_not_required`
+with the deadline mode and exact reason in the completion receipt.
+
+Deterministic checks (tests, typecheck, lint, build, smoke) are authoritative for
+what they cover, but they are not sufficient for completion; a reviewer supplements
+them and never replaces them.
+
+Every correction prompted by a reviewer finding gets a regression test when the
+correction changes behavior.
+
+## Completion gate
+
+Deterministic checks are necessary but not sufficient. Do not claim completion until
+you can show a completion receipt containing:
+
+- the deadline mode, changed-file count, file classifications, risk flags with
+  affected paths, and whether the review trigger was met;
+- the commands run and their exact result and exit codes;
+- the acceptance coverage for every required check;
+- the reviewer status and every Critical or Important finding;
+- a scope statement: what changed and what did not;
+- any blocked condition.
+
+A missing or unverified field means the task is not complete; report it as
+incomplete instead of claiming done.
+
+A required reviewer dispatch that fails, is denied, times out, or returns no result is a
+`verification_blocked` outcome. Report the implementation and its deterministic
+evidence, state explicitly that completion is blocked, and do not claim done. Never
+treat an unperformed review as a passed review, and never record a required review
+as "not required".
+
+If a required reviewer tool is unavailable before dispatch, apply the same
+`verification_blocked` outcome.
+
+Resolve every Critical and Important finding and re-verify before completion. When
+the remediation changes reviewed behavior, request a follow-up review of the changed
+behavior.
 
 ## Deadline awareness
 

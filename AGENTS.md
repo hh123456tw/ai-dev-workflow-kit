@@ -45,15 +45,42 @@ Core must not expose `brainstorming`, `writing-plans`,
 - Implement directly by default. Delegate one bounded DeepSeek worker only when
   file ownership, shared state, independent acceptance, and independent rollback
   all hold. At most one writer at a time.
-- One read-only reviewer after a non-trivial multi-file change.
-- Deterministic checks are the authority. Never claim PASS without executed evidence.
+- Reviewer rules are deadline-aware. Production files are tracked files outside
+  tests/docs/fixtures/examples/generated output; runtime config and package
+  manifests count when they affect behavior/build/packaging/deployment. Build
+  requires review at two or more production files. Feature Freeze requires that
+  threshold plus `demo_path`, `cross_module`, `concurrency`, `shared_state`, or
+  `external_api`. Demo Survival requires that threshold plus `concurrency`,
+  `shared_state`, `external_integration`, or
+  `demo_blocking_cross_module_crash`.
+  Classify every changed file and record every flag as true/false with affected
+  paths before using `review_not_required`. The `explorer` is not a substitute.
+- A required reviewer that fails, is denied, times out, or returns no result is a
+  `verification_blocked` outcome: report the implementation and its deterministic
+  evidence, but do not claim completion. Never treat an unperformed review as a
+  passed review, and never record a required review as "not required".
+- If a required reviewer tool is unavailable before dispatch, apply the same
+  `verification_blocked` outcome.
+- Completion needs a completion receipt: deadline mode, changed-file count, file
+  classifications, risk flags with affected paths, and review trigger,
+  commands with their exact result and exit codes, acceptance coverage, reviewer
+  status and findings, a scope statement, and any blocked condition. Resolve every
+  Critical or Important finding and re-verify before completion.
+- Deterministic checks are authoritative for what they cover, but not sufficient for
+  completion. Never claim PASS without executed evidence.
+- Numeric, performance, concurrency, cache, and resource criteria need a
+  real-path measurement of the command, API, or execution path the request names;
+  a mocked clock, synthetic counter, implementation internals, or self-authored
+  substitute metric is not evidence. Record fixture size, command, threshold,
+  observed value, and exit code.
 - Never start new work from a red baseline.
 
 ## Isolation contract
 
 Core sets its own `OPENCODE_CONFIG_DIR`, its own `XDG_CONFIG_HOME`, and
-`OPENCODE_DISABLE_EXTERNAL_SKILLS=1`. The two CLI Core launchers (`oc-core.ps1`,
-`oc-core.sh`) additionally run with `--pure`. The Desktop Core wrapper does not,
+`OPENCODE_DISABLE_EXTERNAL_SKILLS=1`. The normal CLI Core launchers
+(`oc-core.ps1`, `oc-core.sh`) and the optional Windows CodeGraph treatment launcher
+(`oc-core-codegraph.ps1`) additionally run with `--pure`. The Desktop Core wrapper does not,
 because OpenCode Desktop is Electron and does not forward `--pure` to its OpenCode
 sidecar, so Desktop isolation rests on the same config dir, `XDG_CONFIG_HOME`, and
 external-skills switch. Core deliberately does not set

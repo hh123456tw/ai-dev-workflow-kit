@@ -110,7 +110,10 @@ Shared bounded workers remain the source files under `agents/`. Setup deploys co
 - Chooses and records reversible defaults rather than stopping for approval.
 - Stops only for irreversible/destructive actions, security/credentials, or destructive data migrations.
 - Implements directly by default and uses one bounded DeepSeek implementer only when ownership and acceptance are independent.
-- Uses one final read-only reviewer for non-trivial multi-file changes.
+- Uses a deadline-aware read-only reviewer gate: Build requires the named reviewer
+  for two-or-more-production-file changes; Feature Freeze and Demo Survival require
+  both that file-count threshold and a named risk flag. Explorer cannot substitute,
+  and the completion receipt records per-file classification and flag evidence.
 
 ## 6. Core Skill Deployment
 

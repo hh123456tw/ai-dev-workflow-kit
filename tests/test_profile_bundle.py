@@ -89,6 +89,14 @@ def flat(content: str) -> str:
     return re.sub(r"\s+", " ", content)
 
 
+def section(content: str, heading: str) -> str:
+    match = re.search(
+        rf"(?ms)^## {re.escape(heading)}\s*$(.*?)(?=^## |\Z)",
+        content,
+    )
+    return match.group(1) if match else ""
+
+
 def permission_section(content: str, key: str) -> str:
     match = re.search(
         rf"(?m)^  {key}:\r?\n((?:    \S.*(?:\r?\n|$))+)",
@@ -140,6 +148,76 @@ class ThreeModeBundleTest(unittest.TestCase):
         self.assertEqual(core["subagent_depth"], 1)
 
         self.assertIn("modes/core/skills/", self.read_text(".gitignore"))
+
+    def test_codegraph_canary_is_pinned_core_only_and_keeps_control_clean(self) -> None:
+        control = self.read_json("modes/core/opencode.jsonc")
+        treatment = self.read_json("modes/core/opencode-codegraph.jsonc")
+        self.assertNotIn("mcp", control)
+        self.assertEqual(treatment["default_agent"], "core-lead")
+        self.assertEqual(treatment["model"], control["model"])
+        self.assertEqual(treatment["small_model"], control["small_model"])
+        self.assertNotIn("plugin", treatment)
+        self.assertEqual(set(treatment["mcp"]), {"codegraph"})
+        server = treatment["mcp"]["codegraph"]
+        self.assertEqual(server["type"], "local")
+        self.assertTrue(server["enabled"])
+        self.assertIn("v0.20.1", server["command"][0])
+        self.assertEqual(server["command"][1:], ["--mcp", "--profile=core"])
+
+        installer = self.read_text("scripts/install-codegraph-windows.ps1")
+        for phrase in (
+            "v0.20.1",
+            "codegraph-server-win32-x64.exe",
+            "onnxruntime.dll",
+            "aa1b6108217c119af6ac444b8652a0eadcfe2c343bff78ead2edd15b6b7b15b1",
+            "52f8ebe8f08f369a44fed6d1cb680c7c89169795e1c2949ee25b88b538ef0948",
+            ".sha256",
+            "Get-FileHash",
+        ):
+            self.assertIn(phrase, installer, phrase)
+
+        launcher = self.read_text("scripts/oc-core-codegraph.ps1")
+        for phrase in (
+            "opencode-codegraph.jsonc",
+            "v0.20.1",
+            "--pure",
+            "OPENCODE_CONFIG_DIR",
+            "CODEGRAPH_HOME",
+            "OPENCODE_DISABLE_EXTERNAL_SKILLS",
+            "Get-FileHash",
+        ):
+            self.assertIn(phrase, launcher, phrase)
+        for pinned_hash in (
+            "aa1b6108217c119af6ac444b8652a0eadcfe2c343bff78ead2edd15b6b7b15b1",
+            "52f8ebe8f08f369a44fed6d1cb680c7c89169795e1c2949ee25b88b538ef0948",
+        ):
+            self.assertIn(pinned_hash, launcher)
+            self.assertIn(pinned_hash, installer)
+        self.assert_core_clears_default_plugins("scripts/oc-core-codegraph.ps1")
+
+        setup = self.read_text("scripts/setup-windows.ps1")
+        self.assertIn("opencode-codegraph.jsonc", setup)
+        self.assertIn("oc-core-codegraph.ps1", setup)
+        self.assertIn("oc-core-codegraph.cmd", setup)
+
+        manifest = self.read_text(
+            "docs/research/2026-09-20-codegraph-core-canary.md"
+        )
+        for phrase in (
+            "CodeGraph-only",
+            "oc-core",
+            "oc-core-codegraph",
+            "paired",
+            "strict success",
+            "input tokens",
+            "wall time",
+            "get_edit_context",
+            "get_ai_context",
+            "symbol_search",
+            "persistent memory",
+            "Jev",
+        ):
+            self.assertIn(phrase, manifest, phrase)
 
     def test_core_lead_is_autonomous_and_limited_to_core_skills(self) -> None:
         lead = self.read_text("modes/core/agents/core-lead.md")
@@ -467,6 +545,7 @@ class ThreeModeBundleTest(unittest.TestCase):
         )
         self.assertIn("Three-Mode OpenCode Workflows Design", spec)
         self.assertIn("Verified limitation: one Desktop instance at a time", spec)
+        self.assertIn("deadline-aware read-only reviewer gate", spec)
 
         # Regression guard: the design must not re-claim concurrent Desktop instances.
         self.assertIn("一次只能開一個實例", readme)
@@ -480,6 +559,178 @@ class ThreeModeBundleTest(unittest.TestCase):
             "docs/research/2026-09-19-jev-risk-routed-hybrid-core.md"
         )
         self.assertIn("Research proposal only", research)
+
+    def test_core_completion_gate_policy_requirements(self) -> None:
+        # Static policy-content check, not a behavior guarantee. Baseline finding:
+        # every valid run claimed completion before a required check passed, and one
+        # run shipped with its reviewer dispatch denied. Whether a live model obeys
+        # this prose is measured by the Phase 3 revalidation, not here.
+        lead = self.read_text("modes/core/agents/core-lead.md")
+        gate = flat(section(lead, "Completion gate"))
+        self.assertNotEqual(gate, "", "core-lead must define a Completion gate section")
+
+        for field in (
+            "deadline mode",
+            "changed-file count",
+            "file classifications",
+            "risk flags",
+            "exact result and exit codes",
+            "acceptance coverage",
+            "reviewer status",
+            "scope statement",
+            "blocked condition",
+        ):
+            self.assertIn(field, gate, field)
+
+        self.assertIn("verification_blocked", gate)
+        self.assertIn("do not claim done", gate)
+        self.assertIn("instead of claiming done", gate)
+        self.assertIn("re-verify before completion", gate)
+        # Polarity-aware: the copula is asserted, so negating the rule fails.
+        self.assertIn(
+            "dispatch that fails, is denied, times out, or returns no result is a "
+            "`verification_blocked` outcome",
+            gate,
+        )
+        self.assertIn("reviewer tool is unavailable", gate)
+        self.assertIn("Never treat an unperformed review as a passed review", gate)
+        # Baseline C02: the model skipped a required review by calling the change
+        # trivial. "not required" must not be an available reviewer status.
+        self.assertIn('never record a required review as "not required"', gate)
+
+        agents_doc = self.read_text("AGENTS.md")
+        core_behavior = flat(section(agents_doc, "Core behavior"))
+        self.assertNotEqual(
+            core_behavior, "", "AGENTS.md must define a Core behavior section"
+        )
+        for phrase in (
+            "completion receipt",
+            "verification_blocked",
+            "deadline mode",
+            "Feature Freeze",
+            "Demo Survival",
+            "demo_path",
+            "demo_blocking_cross_module_crash",
+            "Classify every changed file",
+            "`explorer` is not a substitute",
+        ):
+            self.assertIn(phrase, core_behavior, phrase)
+
+        readme_core = flat(section(self.read_text("README.md"), "Core 的行為"))
+        self.assertIn("`explorer` 不可替代", readme_core)
+        self.assertIn("completion receipt", readme_core)
+        self.assertIn("Demo Survival", readme_core)
+        self.assertIn("demo_path", readme_core)
+        self.assertIn("demo_blocking_cross_module_crash", readme_core)
+
+    def test_core_review_trigger_is_objective_and_findings_block(self) -> None:
+        # Baseline C02: the "non-trivial multi-file change" trigger was subjective,
+        # so the model declared a three-file change trivial and dispatched no
+        # reviewer. The trigger must be the changed-file count.
+        lead = self.read_text("modes/core/agents/core-lead.md")
+        self.assertIn("\n    reviewer: allow\n", lead)
+        review = flat(section(lead, "Review"))
+        self.assertNotEqual(review, "", "core-lead must define a Review section")
+
+        for phrase in (
+            "Build: review is required when a change touches two or more production files",
+            "Feature Freeze: review is required only when a change touches two or more production files and at least one",
+            "Demo Survival: review is required only when a change touches two or more production files and at least one",
+            "Production files are tracked files outside tests, documentation, fixtures, examples, and generated output",
+            "Runtime configuration and package manifests count as production",
+            "classify every changed file",
+            "record every risk flag as true or false with affected paths",
+            "demo_path",
+            "cross_module",
+            "concurrency",
+            "shared_state",
+            "external_api",
+            "external_integration",
+            "demo_blocking_cross_module_crash",
+            "review_not_required",
+            "`reviewer` subagent",
+            "`explorer` is not a substitute",
+            "not your judgment",
+            "authoritative for what they cover",
+            "not sufficient for completion",
+            "gets a regression test when the correction changes behavior",
+        ):
+            self.assertIn(phrase, review, phrase)
+
+        self.assertIn(
+            "Feature Freeze: review is required only when a change touches two or more production files and at least one of these flags is true: `demo_path`, `cross_module`, `concurrency`, `shared_state`, or `external_api`",
+            review,
+        )
+        self.assertIn(
+            "Demo Survival: review is required only when a change touches two or more production files and at least one of these flags is true: `concurrency`, `shared_state`, `external_integration`, or `demo_blocking_cross_module_crash`",
+            review,
+        )
+
+        deadline = flat(section(lead, "Deadline awareness"))
+        self.assertIn(
+            "Never invent a deadline; with none stated, use Build discipline and say so",
+            deadline,
+        )
+
+    def test_core_requires_real_path_measurement_evidence(self) -> None:
+        # Baseline finding: Core verified a "<20% warm time" criterion with a
+        # synthetic counter while the measured real ratio was 0.335 (false green).
+        lead = self.read_text("modes/core/agents/core-lead.md")
+        evidence = flat(section(lead, "Real-path evidence"))
+        self.assertNotEqual(
+            evidence, "", "core-lead must define a Real-path evidence section"
+        )
+
+        # Polarity-aware: the prohibition is asserted as one contiguous sentence,
+        # so inverting it into permission fails.
+        self.assertIn(
+            "Do not use a mocked clock, a synthetic counter, implementation "
+            "internals, or a self-authored substitute metric as evidence",
+            evidence,
+        )
+        for phrase in (
+            "real command, API, or execution path",
+            "substitute metric",
+            "fixture or input size",
+            "threshold",
+            "observed value",
+            "exit code",
+        ):
+            self.assertIn(phrase, evidence, phrase)
+
+    def test_reviewer_blocked_smoke_uses_an_isolated_fault_profile(self) -> None:
+        relative = "scripts/smoke-core-reviewer-blocked.ps1"
+        self.assertTrue((ROOT / relative).is_file(), relative)
+        smoke = self.read_text(relative)
+
+        # --auto handles ordinary non-interactive permissions, while an explicit
+        # deny in the temporary profile still fault-injects reviewer failure.
+        for phrase in (
+            "[IO.Path]::GetTempPath()",
+            "reviewer: allow",
+            "reviewer: deny",
+            "OPENCODE_CONFIG_DIR",
+            "Remove-Item Env:OPENCODE_CONFIG_CONTENT",
+            "Remove-Item Env:OPENCODE_DISABLE_DEFAULT_PLUGINS",
+            "--pure",
+            "--auto",
+            "verification_blocked",
+            "CORE_REVIEWER_BLOCKED_SMOKE_PASS",
+            "CORE_REVIEWER_BLOCKED_SELFTEST_PASS",
+            "final_answer",
+            "TaskEvents",
+            "NestedOpenCodeCommands",
+            "positive completion claim",
+            "-SelfTest",
+            "finally",
+        ):
+            self.assertIn(phrase, smoke, phrase)
+
+        self.assertIn(
+            "two or more production files",
+            smoke,
+            "the smoke must exercise the objective reviewer trigger",
+        )
 
 
 if __name__ == "__main__":

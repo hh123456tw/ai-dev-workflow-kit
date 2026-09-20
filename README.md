@@ -89,10 +89,21 @@ oc-core       # 自主 Core，--pure，隔離 config
 - 只有這幾種情況會停下來問：不可逆／破壞性操作、安全或憑證決策、破壞性資料或 schema migration、缺少只有你能提供的存取權。
 - 預設自己實作；只有四條件全部成立才委派一位 DeepSeek worker（互斥檔案所有權、不共用 state／schema／config、獨立驗收、可獨立回滾）。
 - 同一時間只有一位寫入者。
-- 非平凡的多檔改動完成後，派一位唯讀 reviewer。
-- tests／typecheck／lint／build／smoke 永遠是權威。
+- reviewer 採 deadline-aware。Production 檔案指 tests／文件／fixture／範例／生成物以外的 tracked 檔案；會影響行為、build、打包或部署的 runtime config／package manifest 也算。Build 在兩個以上 production 檔案時必審；Feature Freeze 必須再命中 `demo_path`／`cross_module`／`concurrency`／`shared_state`／`external_api`，Demo Survival 必須再命中 `concurrency`／`shared_state`／`external_integration`／`demo_blocking_cross_module_crash`。每個 changed file 都要分類，所有 flag 都要記 true／false 與受影響路徑，才能使用 `review_not_required`。指定 reviewer 是唯讀 `reviewer`；`explorer` 不可替代。
+- 必要 reviewer 無法執行（失敗、被拒絕、逾時、沒有回傳結果）就是 `verification_blocked`：可以回報實作與決定性證據，但**不得宣稱完成**；沒跑過的必要 review 永遠不算通過。
+- 宣稱完成需要一份 completion receipt：deadline mode、改動檔案數、逐檔分類、risk flags 與路徑、review 觸發判定、指令與其確切結果及 exit code、驗收覆蓋、reviewer 狀態與發現、範圍聲明、任何受阻條件。所有 Critical／Important 發現必須解決並重新驗證後才能完成。
+- tests／typecheck／lint／build／smoke 對其涵蓋範圍是權威，但**不足以構成完成**。
+- 數值／效能／並發／快取／資源類驗收條件，必須量測請求所指的真實指令、API 或執行路徑；mock 時鐘、合成計數器、實作內部細節或自製替代指標都不算證據。
 
 ## Windows 安裝
+
+### CodeGraph-only Core canary
+
+正常 `oc-core` 保持無 MCP，作為 A/B control。選配 treatment 先執行
+`scripts/install-codegraph-windows.ps1` 安裝並驗證固定的 CodeGraph `0.20.1`
+Windows binary 與 `onnxruntime.dll`，再執行 setup，使用
+`oc-core-codegraph` 啟動。Treatment 只開官方 `--profile=core`；完整配對量測規則
+見 `docs/research/2026-09-20-codegraph-core-canary.md`。
 
 前置需求：Git、Node.js/npm、OpenCode、PowerShell，以及安裝 gstack 所需的 Git Bash 或 WSL。
 
@@ -108,9 +119,9 @@ setup 會依序：
 1. 備份全域 config、agents、commands、modes（保留最新 3 份備份）。
 2. 安裝／更新 gstack。
 3. 部署共用全域 agents 與 commands。
-4. 部署三個 mode 目錄與 launchers。
+4. 部署三個 mode 目錄、正常 launchers，以及選配的 Core CodeGraph treatment config／launcher。
 5. 從已安裝的 Superpowers 套件複製 6 個 Core skills（**要求 6.3.0**，版本不符會明確失敗，不靜默降級）。
-6. 安裝 `oc-vanilla`／`oc-stable`／`oc-core`，建立兩個 Desktop 捷徑，並列出待清理的舊產物。
+6. 安裝 `oc-vanilla`／`oc-stable`／`oc-core`／`oc-core-codegraph`，建立兩個 Desktop 捷徑，並列出待清理的舊產物。
 
 步驟 5 需要本機已快取 Superpowers 套件。全新機器第一次執行 setup 時它還不存在，setup 會明確失敗並提示：先在 Stable 啟動一次 OpenCode 讓 plugin 安裝，再重跑 setup。這是預期行為，不會靜默降級成完整 plugin。
 
