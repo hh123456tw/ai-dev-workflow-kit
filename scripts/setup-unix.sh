@@ -20,38 +20,51 @@ read_superpowers_version() {
     || true
 }
 
+# Parse a bare major.minor.patch version into a zero-padded key so two versions
+# can be compared with a plain string comparison. Prints nothing unless the whole
+# string is a bare triple, so version selection never needs a GNU-only `sort -V`.
+superpowers_version_key() {
+  local version="$1"
+  if [[ "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+    printf '%010d.%010d.%010d\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
+  fi
+}
+
 # The cache nests by source path, for example
 # packages/superpowers@git+https_/github.com/obra/superpowers.git/node_modules/superpowers
-# so a single-level glob misses it. Search a bounded depth for directories named
-# `superpowers` that carry both a package.json and a skills/ directory.
+# so a single-level glob misses it. Match the package.json path itself with a
+# portable `find` form (no GNU-only `-maxdepth`), then take its directory. Only
+# directories that also carry a skills/ directory are considered.
 find_superpowers_package() {
-  local candidate candidate_version newest
-  local best="" best_version=""
+  local candidate candidate_version candidate_key
+  local best="" best_key="" first=""
   while IFS= read -r candidate; do
     [[ -n "$candidate" ]] || continue
     [[ -f "$candidate/package.json" && -d "$candidate/skills" ]] || continue
+    [[ -n "$first" ]] || first="$candidate"
     candidate_version="$(read_superpowers_version "$candidate/package.json")"
     if [[ "$candidate_version" == "$REQUIRED_SUPERPOWERS_VERSION" ]]; then
       printf '%s\n' "$candidate"
       return 0
     fi
-    # Keep the first candidate so the version check below reports the real
-    # string, then prefer the newest parseable version.
-    if [[ -z "$best" ]]; then
-      best="$candidate"
-      best_version="$candidate_version"
-      continue
-    fi
-    if [[ -n "$candidate_version" && -n "$best_version" && "$candidate_version" != "$best_version" ]]; then
-      newest="$(printf '%s\n%s\n' "$best_version" "$candidate_version" | sort -V 2>/dev/null | tail -n 1)"
-      if [[ "$newest" == "$candidate_version" ]]; then
+    candidate_key="$(superpowers_version_key "$candidate_version")"
+    # Prefer a candidate with a readable, parseable version over one without;
+    # among parseable versions keep the highest. String comparison is safe
+    # because the key is zero-padded to a fixed width.
+    if [[ -n "$candidate_key" ]]; then
+      if [[ -z "$best_key" || "$candidate_key" > "$best_key" ]]; then
         best="$candidate"
-        best_version="$candidate_version"
+        best_key="$candidate_key"
       fi
     fi
-  done < <(find "$HOME/.cache/opencode/packages" -maxdepth 6 -type d -name superpowers 2>/dev/null | sort)
-  # No pinned match: return the newest so the version check can report it clearly.
-  printf '%s\n' "$best"
+  done < <(find "$HOME/.cache/opencode/packages" -type f -name package.json -path '*/superpowers/package.json' 2>/dev/null | while IFS= read -r p; do dirname "$p"; done | sort)
+  # No pinned match: return the newest parseable candidate, or the first one
+  # found when none parses, so the version check can report the real string.
+  if [[ -n "$best" ]]; then
+    printf '%s\n' "$best"
+  else
+    printf '%s\n' "$first"
+  fi
 }
 
 OC_CONFIG="$HOME/.config/opencode"

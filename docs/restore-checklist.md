@@ -4,7 +4,7 @@
 - [ ] Install Git / Node / OpenCode
 - [ ] Run the platform setup script
       (`scripts/setup-windows.ps1` or `scripts/setup-unix.sh`). On a fresh
-      machine the first run stops at step 5 with a clear message because the
+      machine the first run stops at step 4 (`[4/6]`) with a clear message because the
       Superpowers package is not cached yet. That is expected: launch OpenCode
       once in Stable so the plugin installs, then re-run the setup script to
       deploy the Core skills.
