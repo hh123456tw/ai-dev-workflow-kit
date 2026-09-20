@@ -11,6 +11,9 @@ function Get-ResolvedConfig([string]$mode, [bool]$pure = $false) {
   $config = Join-Path $dir 'opencode.jsonc'
   if (-not (Test-Path -LiteralPath $config)) { throw "Mode '$mode' is not deployed at $dir. Run setup first." }
   $env:OPENCODE_CONFIG = $config
+  # Clear an inline config inherited from a parent shell, exactly as the real
+  # launchers do, so a shadowed value cannot produce a false PASS or false FAIL.
+  $env:OPENCODE_CONFIG_CONTENT = $null
   $env:OPENCODE_CONFIG_DIR = $null
   $env:XDG_CONFIG_HOME = $null
   $env:OPENCODE_DISABLE_EXTERNAL_SKILLS = $null
@@ -103,6 +106,7 @@ $coreDesktop = Get-ResolvedConfig 'core' $false
 Assert-CoreIsolation 'Core Desktop' $coreDesktop
 
 $env:OPENCODE_CONFIG = $null
+$env:OPENCODE_CONFIG_CONTENT = $null
 $env:OPENCODE_CONFIG_DIR = $null
 $env:XDG_CONFIG_HOME = $null
 $env:OPENCODE_DISABLE_EXTERNAL_SKILLS = $null

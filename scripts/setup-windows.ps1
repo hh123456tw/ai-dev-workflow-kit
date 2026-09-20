@@ -230,6 +230,9 @@ foreach ($mode in @('vanilla', 'stable', 'core')) {
   Set-Content -Path (Join-Path $Bin "oc-$mode.cmd") -Value $content -Encoding ASCII
 }
 $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+# A fresh profile can have no user-level PATH; treat null/empty as an empty list
+# so TrimEnd does not throw under $ErrorActionPreference='Stop'.
+if ([string]::IsNullOrEmpty($userPath)) { $userPath = '' }
 if (($userPath -split ';') -notcontains $Bin) {
   [Environment]::SetEnvironmentVariable('Path', (($userPath.TrimEnd(';') + ';' + $Bin).Trim(';')), 'User')
   Write-Warning "Added $Bin to user PATH. Open a new terminal before using oc-vanilla, oc-stable, or oc-core."

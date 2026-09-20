@@ -1,4 +1,8 @@
-# Single workflow
+# Stable mode
+
+Stable is one of three isolated modes (Vanilla, Stable, Core). It keeps the full
+Superpowers plugin and the cost-control lead; this document describes only the
+Stable workflow.
 
 ## Stack
 
@@ -27,7 +31,7 @@ gstack QA / ship
 
 ## Rules
 
-1. One workflow. The user does not choose a mode; the lead scales process to scope and deadline.
+1. Stable is one of three modes (Vanilla, Stable, Core). Within Stable the user does not choose a mode; the lead scales process to scope and deadline.
 2. At most one writer is active at a time.
 3. Delegate only when all four conditions hold: distinct file ownership; no shared route, state, schema, config, or mutable fixture; independent acceptance check; independent rollback.
 4. Progress is judged by artifacts, not status messages. No wall-clock reporting requirements.

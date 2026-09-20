@@ -130,6 +130,16 @@ $vanillaLauncher = Read-Text 'scripts\oc-vanilla.ps1'
 Assert-True ($vanillaLauncher -notmatch '--pure') 'Vanilla launcher must not use pure mode'
 Assert-True ($vanillaLauncher -notmatch 'XDG_CONFIG_HOME') 'Vanilla launcher must not isolate XDG_CONFIG_HOME'
 
+# Vanilla and Stable must clear an inherited OPENCODE_DISABLE_DEFAULT_PLUGINS so
+# the built-in provider plugins stay enabled for the pinned model. Only the Core
+# entry points were covered before.
+foreach ($entry in @(
+    'scripts\oc-vanilla.ps1', 'scripts\oc-vanilla.sh',
+    'scripts\oc-stable.ps1', 'scripts\oc-stable.sh',
+    'scripts\desktop-vanilla.ps1')) {
+  Assert-CoreClearsDefaultPlugins (Read-Text $entry) $entry
+}
+
 $desktopCore = Read-Text 'scripts\desktop-core.ps1'
 $desktopVanilla = Read-Text 'scripts\desktop-vanilla.ps1'
 Assert-True ($desktopCore -match 'desktop-core') 'Core Desktop wrapper must use its own user-data directory'
@@ -245,6 +255,16 @@ foreach ($readOnly in @('explorer', 'reviewer')) {
   Assert-True ($workers[$readOnly] -match '(?m)^  edit: deny\s*$') "$readOnly must be read-only"
 }
 Assert-True ($workers['implementer'] -match '(?m)^## Completion handback\s*$') 'implementer must use the exact Completion handback heading'
+
+# The binding requirement denies credential paths in every agent, including both
+# primary agents. Only the four workers were covered before.
+foreach ($primary in @(
+    @('stable-lead', (Read-Text 'agents\stable-lead.md')),
+    @('core-lead', (Read-Text 'modes\core\agents\core-lead.md')))) {
+  $primaryName = $primary[0]; $primaryContent = $primary[1]
+  $primaryRead = Get-PermissionSection $primaryContent 'read'
+  Assert-True (([regex]::Matches($primaryRead, '":\s*deny')).Count -eq $secretPaths.Count) "$primaryName read section must contain exactly the secret denials"
+}
 
 # --- Documentation ------------------------------------------------------------
 

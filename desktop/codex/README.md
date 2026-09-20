@@ -2,11 +2,10 @@
 
 > **Historical context.** Earlier revisions of this repository paired Codex
 > Desktop with an "OpenCode TEAM V2" workflow and later with a multi-agent
-> "Team MVP Sprint". Both are retired. The active workflow is the single
-> workflow defined in
-> [`docs/superpowers/specs/2026-09-18-single-workflow-design.md`](../../docs/superpowers/specs/2026-09-18-single-workflow-design.md),
-> reached through `profiles/product` / `oc-product` or the `/stable` slash
-> command.
+> "Team MVP Sprint". Both are retired. The active design is the three-mode
+> OpenCode workflow (Vanilla, Stable, Core) described in
+> [`docs/superpowers/specs/2026-09-19-three-mode-opencode-workflows-design.md`](../../docs/superpowers/specs/2026-09-19-three-mode-opencode-workflows-design.md);
+> Stable is reached through `oc-stable` or the `/stable` slash command.
 
 This repo backs up the **workflow intent**, not account credentials.
 
@@ -17,17 +16,17 @@ OpenCode Desktop/TUI for implementation. On a new computer:
 2. Reconnect any required plugins/apps in Codex Sources / Plugins.
 3. Re-authorize provider-backed plugins; OAuth/account grants are not stored in this repo.
 4. Open the target project repository.
-5. If you use Superpowers in Codex as a separate workflow, install it through the Codex plugin surface available to your account. Keep that separate from the OpenCode single workflow.
+5. If you use Superpowers in Codex as a separate workflow, install it through the Codex plugin surface available to your account. Keep that separate from the OpenCode modes.
 6. Keep secrets in account/plugin authorization or local secure storage, never in this Git repo.
 
 ## Recommended Codex role alongside this repo
 
-When using Codex Desktop alongside the OpenCode single workflow:
+When using Codex Desktop alongside the OpenCode modes:
 
 - architecture / plan review
 - spec challenge
 - final diff / PR review
 - difficult fallback implementation when the configured worker model fails
 
-OpenCode (global `/stable` or the `oc-product` profile) remains the execution
-environment.
+OpenCode remains the execution environment: Stable via `oc-stable` or the
+`/stable` slash command, and Core via `oc-core`.

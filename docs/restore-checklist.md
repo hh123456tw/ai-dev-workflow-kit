@@ -3,7 +3,11 @@
 - [ ] Clone this repository
 - [ ] Install Git / Node / OpenCode
 - [ ] Run the platform setup script
-      (`scripts/setup-windows.ps1` or `scripts/setup-unix.sh`)
+      (`scripts/setup-windows.ps1` or `scripts/setup-unix.sh`). On a fresh
+      machine the first run stops at step 5 with a clear message because the
+      Superpowers package is not cached yet. That is expected: launch OpenCode
+      once in Stable so the plugin installs, then re-run the setup script to
+      deploy the Core skills.
 - [ ] Confirm the global `opencode.jsonc` loads the Superpowers plugin and sets
       `"default_agent": "stable-lead"`. Without the plugin, Stable has no
       Superpowers skills.
@@ -15,11 +19,13 @@
 - [ ] Verify Vanilla resolves `build` with the full Superpowers skill set,
       including `brainstorming` and `subagent-driven-development`
 - [ ] Verify Stable resolves `stable-lead` with the full Superpowers skill set
-- [ ] Verify Core resolves `core-lead`, shows `plugin = (none)`, and lists exactly
-      the six Core skills
+- [ ] Verify Core resolves `core-lead`, shows `plugin = (none)`, lists the six
+      curated Core skills, and hides the heavy skills (OpenCode's own built-ins
+      are not part of that count)
 - [ ] Verify Core does NOT list `brainstorming`, `writing-plans`,
       `subagent-driven-development`, or `using-git-worktrees`
-- [ ] Verify `modes/core/skills/manifest.json` records Superpowers 6.3.0
+- [ ] Verify `~/.config/opencode/modes/core/skills/manifest.json` records
+      Superpowers 6.3.0
 - [ ] Verify `oc-vanilla`, `oc-stable`, and `oc-core` resolve on PATH
 - [ ] Verify the stock OpenCode shortcut still opens Stable and was not modified
 - [ ] Verify the `OpenCode Vanilla` and `OpenCode Core` shortcuts exist

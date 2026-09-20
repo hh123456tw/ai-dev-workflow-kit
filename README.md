@@ -1,6 +1,6 @@
 # OpenCode 三模式工作流工具組
 
-可攜的 OpenCode 設定，提供**三套互相隔離**的開發模式。本 repository 只保存設定與還原腳本；憑證、OAuth 狀態、快取及第三方框架原始碼都留在本機。新電腦 clone 之後跑一次 setup 腳本，即可還原到與主力機相同的配置（剩下只需 `opencode auth login`）。
+可攜的 OpenCode 設定，提供**三套互相隔離**的開發模式。本 repository 只保存設定與還原腳本；憑證、OAuth 狀態、快取及第三方框架原始碼都留在本機。新電腦 clone 之後是**兩步**：先跑一次 setup 讓 plugin 被宣告，在 Stable 啟動一次 OpenCode 讓 Superpowers plugin 安裝，再跑一次 setup 部署 Core skills（剩下只需 `opencode auth login`）。
 
 ## 三種模式
 
@@ -8,9 +8,11 @@
 |---|---|---|---|
 | **Vanilla** | 完整 upstream Superpowers，作為 reference 與最大嚴謹度 fallback | `build`（OpenCode 內建） | 完整 plugin／bootstrap |
 | **Stable** | 安全日常模式，現有 cost-control／one-writer／bounded delegation／reviewer 規則 | `stable-lead` | 完整 plugin／bootstrap |
-| **Core** | Hackathon／MVP 快速自主模式 | `core-lead` | 只有 6 個精選 skills，**不載入 bootstrap** |
+| **Core** | Hackathon／MVP 快速自主模式 | `core-lead` | 6 個精選 skills 加 OpenCode 內建，**不載入 bootstrap** |
 
-### Core 的 6 個 skills
+### Core 的精選 skills
+
+Core 暴露以下六個精選 skills，並隱藏重型 skills：
 
 1. `test-driven-development`
 2. `systematic-debugging`
@@ -44,7 +46,7 @@ Vanilla 功能正確但拓撲不固定（2 到 17 個 session），時間與成�
 - Vanilla 與 Stable 需要完整 Superpowers plugin 與 bootstrap。
 - Core 必須完全看不到 bootstrap 與重型 skills。
 
-因此 Core 使用獨立的 config dir、獨立的 `XDG_CONFIG_HOME`，並停用外部 skills。CLI 的 Core launcher 另外以 `--pure` 執行；Desktop 的 Core wrapper 因為 Electron 不會把 `--pure` 傳給 OpenCode sidecar，改用上述隔離的 config dir／`XDG_CONFIG_HOME` 達成同樣效果。Core 刻意**不**停用預設 plugins，因為那會一併移除解析 pinned model 所需的內建 provider plugins。這已用 `opencode debug config` 與 `opencode debug skill` 驗證：Core 只看到 6 個 skills，plugin 為 none。
+因此 Core 使用獨立的 config dir、獨立的 `XDG_CONFIG_HOME`，並停用外部 skills。CLI 的 Core launcher 另外以 `--pure` 執行；Desktop 的 Core wrapper 因為 Electron 不會把 `--pure` 傳給 OpenCode sidecar，改用上述隔離的 config dir／`XDG_CONFIG_HOME` 達成同樣效果。Core 刻意**不**停用預設 plugins，因為那會一併移除解析 pinned model 所需的內建 provider plugins。這已用 `opencode debug config` 與 `opencode debug skill` 驗證：Core 看到六個精選 skills、看不到重型 skills，plugin 為 none。
 
 ## 入口
 
@@ -78,7 +80,7 @@ oc-core       # 自主 Core，--pure，隔離 config
 
 ### Slash command
 
-`/stable` 仍可用於任何模式。
+`/stable` 可用於 Vanilla 與 Stable 兩個模式。Core 使用自己的 `core-lead`，其隔離 config 目錄不含 `commands/`，因此**不暴露 `/stable`**。
 
 ## Core 的行為
 
@@ -110,6 +112,8 @@ setup 會依序：
 5. 從已安裝的 Superpowers 套件複製 6 個 Core skills（**要求 6.3.0**，版本不符會明確失敗，不靜默降級）。
 6. 安裝 `oc-vanilla`／`oc-stable`／`oc-core`，建立兩個 Desktop 捷徑，並列出待清理的舊產物。
 
+步驟 5 需要本機已快取 Superpowers 套件。全新機器第一次執行 setup 時它還不存在，setup 會明確失敗並提示：先在 Stable 啟動一次 OpenCode 讓 plugin 安裝，再重跑 setup。這是預期行為，不會靜默降級成完整 plugin。
+
 `~/.config/opencode/opencode.jsonc` 已存在時，setup 只會警告並保留原檔。
 
 舊產物（`team-*`、`profiles/`、`ensemble.*`、`oc-product`）加 `-CleanLegacy` 一次清除。
@@ -124,6 +128,8 @@ chmod +x scripts/*.sh
 ```
 
 Unix 只提供三個 CLI launcher，不建立 Desktop 捷徑（Desktop 捷徑是 Windows-only）。舊產物清理用 `--clean-legacy`。
+
+與 Windows 相同，步驟 5 需要本機已快取 Superpowers 套件。全新機器的第一次 setup 會明確失敗；先在 Stable 啟動一次 OpenCode 讓 plugin 安裝，再重跑 `./scripts/setup-unix.sh`。
 
 ## 驗證
 

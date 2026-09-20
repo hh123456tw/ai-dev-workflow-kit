@@ -187,6 +187,31 @@ class ThreeModeBundleTest(unittest.TestCase):
         ):
             self.assertTrue((ROOT / relative).is_file(), relative)
 
+    def test_vanilla_and_stable_clear_default_plugins(self) -> None:
+        # Vanilla and Stable must clear an inherited OPENCODE_DISABLE_DEFAULT_PLUGINS
+        # so the built-in provider plugins stay enabled for the pinned model. Only
+        # the Core entry points were covered before.
+        for relative in (
+            "scripts/oc-vanilla.ps1",
+            "scripts/oc-vanilla.sh",
+            "scripts/oc-stable.ps1",
+            "scripts/oc-stable.sh",
+            "scripts/desktop-vanilla.ps1",
+        ):
+            self.assert_core_clears_default_plugins(relative)
+
+    def test_primary_agents_deny_credential_paths(self) -> None:
+        # The binding requirement denies credential paths in every agent. Only the
+        # four workers were covered; the two primary agents were not.
+        for relative in ("agents/stable-lead.md", "modes/core/agents/core-lead.md"):
+            content = self.read_text(relative)
+            for pattern in SECRET_PATHS:
+                self.assertRegex(
+                    content,
+                    re.compile(rf'(?m)^    "{re.escape(pattern)}": deny\s*$'),
+                    f"{relative} {pattern}",
+                )
+
     def test_desktop_wrappers_use_separate_user_data_dirs(self) -> None:
         core = self.read_text("scripts/desktop-core.ps1")
         vanilla = self.read_text("scripts/desktop-vanilla.ps1")

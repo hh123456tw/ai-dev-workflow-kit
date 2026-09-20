@@ -14,6 +14,46 @@ command -v opencode >/dev/null || { echo 'opencode required' >&2; exit 1; }
 CORE_SKILLS=(test-driven-development systematic-debugging verification-before-completion requesting-code-review receiving-code-review finishing-a-development-branch)
 REQUIRED_SUPERPOWERS_VERSION="6.3.0"
 
+read_superpowers_version() {
+  python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['version'])" "$1" 2>/dev/null \
+    || node -e "console.log(require(process.argv[1]).version)" "$1" 2>/dev/null \
+    || true
+}
+
+# The cache nests by source path, for example
+# packages/superpowers@git+https_/github.com/obra/superpowers.git/node_modules/superpowers
+# so a single-level glob misses it. Search a bounded depth for directories named
+# `superpowers` that carry both a package.json and a skills/ directory.
+find_superpowers_package() {
+  local candidate candidate_version newest
+  local best="" best_version=""
+  while IFS= read -r candidate; do
+    [[ -n "$candidate" ]] || continue
+    [[ -f "$candidate/package.json" && -d "$candidate/skills" ]] || continue
+    candidate_version="$(read_superpowers_version "$candidate/package.json")"
+    if [[ "$candidate_version" == "$REQUIRED_SUPERPOWERS_VERSION" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+    # Keep the first candidate so the version check below reports the real
+    # string, then prefer the newest parseable version.
+    if [[ -z "$best" ]]; then
+      best="$candidate"
+      best_version="$candidate_version"
+      continue
+    fi
+    if [[ -n "$candidate_version" && -n "$best_version" && "$candidate_version" != "$best_version" ]]; then
+      newest="$(printf '%s\n%s\n' "$best_version" "$candidate_version" | sort -V 2>/dev/null | tail -n 1)"
+      if [[ "$newest" == "$candidate_version" ]]; then
+        best="$candidate"
+        best_version="$candidate_version"
+      fi
+    fi
+  done < <(find "$HOME/.cache/opencode/packages" -maxdepth 6 -type d -name superpowers 2>/dev/null | sort)
+  # No pinned match: return the newest so the version check can report it clearly.
+  printf '%s\n' "$best"
+}
+
 OC_CONFIG="$HOME/.config/opencode"
 MODES_DIR="$OC_CONFIG/modes"
 
@@ -22,7 +62,11 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP="$OC_CONFIG/backup_$STAMP"
 mkdir -p "$BACKUP"
 for item in opencode.jsonc agents commands modes; do
-  [[ -e "$OC_CONFIG/$item" ]] && cp -R "$OC_CONFIG/$item" "$BACKUP/" || true
+  # Copy only when the source exists; a genuine copy failure must surface rather
+  # than being swallowed by an `|| true` arm.
+  if [[ -e "$OC_CONFIG/$item" ]]; then
+    cp -R "$OC_CONFIG/$item" "$BACKUP/"
+  fi
 done
 i=0
 for d in $(ls -d "$OC_CONFIG"/backup_* 2>/dev/null | sort -r); do
@@ -78,12 +122,9 @@ else
 fi
 
 printf '[4/6] Deploying Core skills from the installed Superpowers package...\n'
-SUPERPOWERS=""
-for dir in "$HOME"/.cache/opencode/packages/superpowers*; do
-  if [[ -f "$dir/node_modules/superpowers/package.json" ]]; then SUPERPOWERS="$dir/node_modules/superpowers"; break; fi
-done
+SUPERPOWERS="$(find_superpowers_package)"
 [[ -n "$SUPERPOWERS" ]] || { echo 'Superpowers package not found under ~/.cache/opencode/packages. Launch OpenCode once in Stable so the plugin installs, then re-run setup.' >&2; exit 1; }
-VERSION="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['version'])" "$SUPERPOWERS/package.json" 2>/dev/null || node -e "console.log(require('$SUPERPOWERS/package.json').version)")"
+VERSION="$(read_superpowers_version "$SUPERPOWERS/package.json")"
 [[ "$VERSION" == "$REQUIRED_SUPERPOWERS_VERSION" ]] || { echo "Superpowers $VERSION found but $REQUIRED_SUPERPOWERS_VERSION is required. Update the repository pin deliberately." >&2; exit 1; }
 rm -rf "$CORE_DIR/skills"
 mkdir -p "$CORE_DIR/skills"

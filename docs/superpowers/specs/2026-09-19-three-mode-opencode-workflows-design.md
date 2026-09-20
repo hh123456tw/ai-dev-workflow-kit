@@ -1,7 +1,7 @@
 # Three-Mode OpenCode Workflows Design
 
 **Date:** 2026-09-19  
-**Status:** Approved design; implementation not started  
+**Status:** Implemented. The verified Desktop single-instance limitation is recorded in §8.2.1, and the Core provider-plugin correction is recorded in §8.2.  
 **Scope:** OpenCode CLI and Desktop on Windows, plus CLI launchers on Unix
 
 ## 1. Goal
