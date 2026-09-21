@@ -68,7 +68,6 @@ $legacyWorkflow = '(?i)matt\s+pocock|grill|to-spec|to-tickets|wayfinder|\bDAG\b|
 $vanilla = Read-Json 'modes\vanilla\opencode.jsonc'
 $stable = Read-Json 'modes\stable\opencode.jsonc'
 $core = Read-Json 'modes\core\opencode.jsonc'
-$coreCodeGraph = Read-Json 'modes\core\opencode-codegraph.jsonc'
 
 Assert-True ($vanilla.default_agent -eq 'build') 'Vanilla must default to the upstream build agent'
 Assert-True ($stable.default_agent -eq 'stable-lead') 'Stable must default to stable-lead'
@@ -86,10 +85,8 @@ Assert-True (@($stable.plugin) -contains $superpowersSpec) 'Stable must load ful
 Assert-True ($null -eq $core.plugin) 'Core must not declare any plugin'
 Assert-True ($core.subagent_depth -eq 1) 'Core must limit subagent depth to 1'
 Assert-True ($null -eq $core.mcp) 'Core control must not load CodeGraph or another MCP'
-Assert-True ($coreCodeGraph.default_agent -eq 'core-lead') 'CodeGraph canary must keep core-lead'
-Assert-True ($coreCodeGraph.mcp.codegraph.type -eq 'local') 'CodeGraph canary must use a local MCP'
-Assert-True ($coreCodeGraph.mcp.codegraph.command[0] -match 'v0\.20\.1') 'CodeGraph canary must pin version 0.20.1'
-Assert-True (($coreCodeGraph.mcp.codegraph.command -join ' ') -match '--mcp --profile=core') 'CodeGraph canary must expose only the upstream core tool profile'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $Root 'modes\core\opencode-codegraph.jsonc'))) 'retired CodeGraph treatment config must be absent'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $Root 'scripts\oc-core-codegraph.ps1'))) 'retired CodeGraph launcher must be absent'
 
 # Core skills are deployed from the installed package, never vendored
 $gitignore = Read-Text '.gitignore'
@@ -181,7 +178,7 @@ Assert-True ($smokeSelfTestOutput -match 'CORE_REVIEWER_BLOCKED_SELFTEST_PASS') 
 # --- Launchers and Desktop wrappers ------------------------------------------
 
 foreach ($script in @(
-    'scripts\oc-vanilla.ps1', 'scripts\oc-stable.ps1', 'scripts\oc-core.ps1', 'scripts\oc-core-codegraph.ps1',
+    'scripts\oc-vanilla.ps1', 'scripts\oc-stable.ps1', 'scripts\oc-core.ps1',
     'scripts\oc-vanilla.sh', 'scripts\oc-stable.sh', 'scripts\oc-core.sh',
     'scripts\desktop-vanilla.ps1', 'scripts\desktop-core.ps1',
     'scripts\opencode-desktop-common.ps1', 'scripts\verify-modes.ps1')) {
@@ -195,36 +192,35 @@ Assert-True ($coreLauncher -match 'OPENCODE_CONFIG_DIR') 'Core launcher must iso
 Assert-True ($coreLauncher -match 'OPENCODE_DISABLE_EXTERNAL_SKILLS') 'Core launcher must disable external skills'
 Assert-CoreClearsDefaultPlugins $coreLauncher 'Core launcher'
 
-$codeGraphLauncher = Read-Text 'scripts\oc-core-codegraph.ps1'
 $codeGraphInstaller = Read-Text 'scripts\install-codegraph-windows.ps1'
 foreach ($hash in @(
     'aa1b6108217c119af6ac444b8652a0eadcfe2c343bff78ead2edd15b6b7b15b1',
     '52f8ebe8f08f369a44fed6d1cb680c7c89169795e1c2949ee25b88b538ef0948')) {
-  Assert-True ($codeGraphLauncher -match $hash) "CodeGraph launcher must enforce pinned hash $hash"
-  Assert-True ($codeGraphInstaller -match $hash) "CodeGraph installer and launcher must share pinned hash $hash"
+  Assert-True ($codeGraphInstaller -match $hash) "retained research installer must enforce pinned hash $hash"
 }
-Assert-CoreClearsDefaultPlugins $codeGraphLauncher 'Core CodeGraph launcher'
-
-$canaryRoot = Join-Path ([IO.Path]::GetTempPath()) ("opencode-codegraph-launcher-test-" + [guid]::NewGuid().ToString('N'))
-$originalUserProfile = $env:USERPROFILE
-try {
-  $canaryMode = Join-Path $canaryRoot '.config\opencode\modes\core'
-  New-Item -ItemType Directory -Force -Path (Join-Path $canaryMode 'skills\test-driven-development') | Out-Null
-  [IO.File]::WriteAllText((Join-Path $canaryMode 'opencode-codegraph.jsonc'), '{}')
-  $env:USERPROFILE = $canaryRoot
-  $missingOutput = & pwsh -NoProfile -File (Join-Path $Root 'scripts\oc-core-codegraph.ps1') 2>&1 | Out-String
-  Assert-True ($LASTEXITCODE -ne 0 -and $missingOutput -match 'Pinned CodeGraph 0\.20\.1 is missing') 'CodeGraph launcher must fail clearly when the pinned binary is missing'
-
-  $fakeEngineDir = Join-Path $canaryRoot '.codegraph\bin\v0.20.1'
-  New-Item -ItemType Directory -Force -Path $fakeEngineDir | Out-Null
-  [IO.File]::WriteAllText((Join-Path $fakeEngineDir 'codegraph-server-win32-x64.exe'), 'tampered')
-  [IO.File]::WriteAllText((Join-Path $fakeEngineDir 'onnxruntime.dll'), 'tampered')
-  $tamperedOutput = & pwsh -NoProfile -File (Join-Path $Root 'scripts\oc-core-codegraph.ps1') 2>&1 | Out-String
-  Assert-True ($LASTEXITCODE -ne 0 -and $tamperedOutput -match 'checksum mismatch') 'CodeGraph launcher must fail clearly when the pinned binary is tampered'
-} finally {
-  $env:USERPROFILE = $originalUserProfile
-  if (Test-Path -LiteralPath $canaryRoot) { Remove-Item -LiteralPath $canaryRoot -Recurse -Force }
+$setup = Read-Text 'scripts\setup-windows.ps1'
+Assert-True ($setup -notmatch 'Copy-Item[^\r\n]*(?:opencode-codegraph|oc-core-codegraph)') 'setup must not deploy retired CodeGraph canary files'
+Assert-True ($setup -notmatch 'Set-Content[^\r\n]*oc-core-codegraph') 'setup must not create the retired CodeGraph shim'
+$launcherDeploy = [regex]::Match($setup, 'foreach \(\$script in @\((.*?)\)\) \{\s*Copy-Item .*?\$script', [Text.RegularExpressions.RegexOptions]::Singleline)
+Assert-True $launcherDeploy.Success 'setup must expose its launcher deployment list to acceptance checks'
+Assert-True ($launcherDeploy.Groups[1].Value -notmatch 'oc-core-codegraph\.ps1') 'launcher deployment list must exclude retired CodeGraph launcher'
+$shimDeploy = [regex]::Match($setup, 'foreach \(\$mode in @\(([^)]*)\)\) \{\s*\$content =', [Text.RegularExpressions.RegexOptions]::Singleline)
+Assert-True $shimDeploy.Success 'setup must expose its shim deployment list to acceptance checks'
+Assert-True ($shimDeploy.Groups[1].Value -notmatch 'core-codegraph') 'shim deployment list must exclude retired CodeGraph shim'
+foreach ($cleanupTarget in @(
+  "Join-Path `$CoreDir 'opencode-codegraph.jsonc'",
+  "Join-Path `$ModesDir 'oc-core-codegraph.ps1'",
+  "Join-Path `$Bin 'oc-core-codegraph.cmd'"
+)) {
+  Assert-True ($setup.Contains($cleanupTarget)) "setup must clean exact retired artifact: $cleanupTarget"
 }
+Assert-True ($setup.Contains('Remove-Item -LiteralPath $artifact -Force')) 'setup must remove each retired CodeGraph artifact'
+Assert-True ($setup.IndexOf('$RetiredCodeGraphArtifacts') -lt $setup.IndexOf('[1/6] Installing/updating gstack')) 'setup must clean retired CodeGraph artifacts before fallible installation work'
+
+$codeGraphResearch = Read-Text 'docs\research\2026-09-20-codegraph-core-canary.md'
+Assert-True ($codeGraphResearch -match 'C02 and C08') 'research decision must identify the two provider-quota interruptions'
+Assert-True ($codeGraphResearch -match 'C01 exhausted the outer') 'research decision must distinguish the C01 command-budget interruption'
+Assert-True ($codeGraphResearch -match 'Three treatment arms were') 'research decision must record the three continued treatment sessions'
 
 $coreLauncherSh = Read-Text 'scripts\oc-core.sh'
 Assert-True ($coreLauncherSh -match '--pure') 'Core shell launcher must run OpenCode in pure mode'

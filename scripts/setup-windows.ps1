@@ -62,11 +62,10 @@ function Get-WorkingBash {
   return $null
 }
 
-Require-Command git
-Require-Command opencode
-
 $OcConfig = Join-Path $env:USERPROFILE '.config\opencode'
 $ModesDir = Join-Path $OcConfig 'modes'
+$CoreDir = Join-Path $ModesDir 'core'
+$Bin = Join-Path $env:USERPROFILE 'bin'
 
 Write-Host '[0/6] Backing up managed configuration...'
 $Stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
@@ -95,7 +94,7 @@ if (Test-Path -LiteralPath $modesSource) {
   if (Test-Path -LiteralPath $coreSource) {
     $coreTarget = Join-Path $modesTarget 'core'
     New-Item -ItemType Directory -Force -Path $coreTarget | Out-Null
-    foreach ($item in @('opencode.jsonc', 'opencode-codegraph.jsonc', 'agents')) {
+    foreach ($item in @('opencode.jsonc', 'agents')) {
       $source = Join-Path $coreSource $item
       if (Test-Path -LiteralPath $source) { Copy-Item -LiteralPath $source -Destination (Join-Path $coreTarget $item) -Recurse -Force }
     }
@@ -122,6 +121,21 @@ Get-ChildItem -Path $OcConfig -Directory -Filter 'backup_*' | Sort-Object Name -
   Remove-Item -LiteralPath $_.FullName -Recurse -Force
 }
 Write-Host "  backup written to $Backup"
+
+$RetiredCodeGraphArtifacts = @(
+  (Join-Path $CoreDir 'opencode-codegraph.jsonc'),
+  (Join-Path $ModesDir 'oc-core-codegraph.ps1'),
+  (Join-Path $Bin 'oc-core-codegraph.cmd')
+)
+foreach ($artifact in $RetiredCodeGraphArtifacts) {
+  if (Test-Path -LiteralPath $artifact) {
+    Remove-Item -LiteralPath $artifact -Force
+    Write-Host "  removed retired CodeGraph canary artifact: $artifact"
+  }
+}
+
+Require-Command git
+Require-Command opencode
 
 Write-Host '[1/6] Installing/updating gstack for OpenCode...'
 $GstackHome = Join-Path $env:USERPROFILE '.local\share\gstack'
@@ -158,16 +172,14 @@ foreach ($mode in @('vanilla', 'stable')) {
   New-Item -ItemType Directory -Force -Path $target | Out-Null
   Copy-Item (Join-Path $RepoRoot "modes\$mode\opencode.jsonc") (Join-Path $target 'opencode.jsonc') -Force
 }
-$CoreDir = Join-Path $ModesDir 'core'
 New-Item -ItemType Directory -Force -Path (Join-Path $CoreDir 'agents') | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $CoreDir 'xdg') | Out-Null
 Copy-Item (Join-Path $RepoRoot 'modes\core\opencode.jsonc') (Join-Path $CoreDir 'opencode.jsonc') -Force
-Copy-Item (Join-Path $RepoRoot 'modes\core\opencode-codegraph.jsonc') (Join-Path $CoreDir 'opencode-codegraph.jsonc') -Force
 Copy-Item (Join-Path $RepoRoot 'modes\core\agents\core-lead.md') (Join-Path $CoreDir 'agents') -Force
 foreach ($worker in @('explorer.md', 'implementer.md', 'reviewer.md', 'test-writer.md')) {
   Copy-Item (Join-Path $RepoRoot "agents\$worker") (Join-Path $CoreDir 'agents') -Force
 }
-foreach ($script in @('opencode-desktop-common.ps1', 'desktop-vanilla.ps1', 'desktop-core.ps1', 'oc-vanilla.ps1', 'oc-stable.ps1', 'oc-core.ps1', 'oc-core-codegraph.ps1')) {
+foreach ($script in @('opencode-desktop-common.ps1', 'desktop-vanilla.ps1', 'desktop-core.ps1', 'oc-vanilla.ps1', 'oc-stable.ps1', 'oc-core.ps1')) {
   Copy-Item (Join-Path $RepoRoot "scripts\$script") (Join-Path $ModesDir $script) -Force
 }
 Write-Host "  deployed vanilla, stable, core, and mode launchers under $ModesDir."
@@ -224,23 +236,20 @@ foreach ($skill in $CoreSkills) {
 Write-Host "  deployed $($CoreSkills.Count) Core skills from Superpowers $version."
 
 Write-Host '[5/6] Installing CLI launchers...'
-$Bin = Join-Path $env:USERPROFILE 'bin'
 New-Item -ItemType Directory -Force -Path $Bin | Out-Null
 foreach ($mode in @('vanilla', 'stable', 'core')) {
   $content = "@echo off`r`npowershell -NoProfile -ExecutionPolicy Bypass -File `"$ModesDir\oc-$mode.ps1`" %*`r`n"
   Set-Content -Path (Join-Path $Bin "oc-$mode.cmd") -Value $content -Encoding ASCII
 }
-$codeGraphContent = "@echo off`r`npowershell -NoProfile -ExecutionPolicy Bypass -File `"$ModesDir\oc-core-codegraph.ps1`" %*`r`n"
-Set-Content -Path (Join-Path $Bin 'oc-core-codegraph.cmd') -Value $codeGraphContent -Encoding ASCII
 $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 # A fresh profile can have no user-level PATH; treat null/empty as an empty list
 # so TrimEnd does not throw under $ErrorActionPreference='Stop'.
 if ([string]::IsNullOrEmpty($userPath)) { $userPath = '' }
 if (($userPath -split ';') -notcontains $Bin) {
   [Environment]::SetEnvironmentVariable('Path', (($userPath.TrimEnd(';') + ';' + $Bin).Trim(';')), 'User')
-  Write-Warning "Added $Bin to user PATH. Open a new terminal before using oc-vanilla, oc-stable, oc-core, or oc-core-codegraph."
+  Write-Warning "Added $Bin to user PATH. Open a new terminal before using oc-vanilla, oc-stable, or oc-core."
 }
-Write-Host '  installed oc-vanilla, oc-stable, oc-core, and oc-core-codegraph.'
+Write-Host '  installed oc-vanilla, oc-stable, and oc-core.'
 
 Write-Host '[6/6] Creating Desktop shortcuts and cleaning up retired artifacts...'
 $shell = New-Object -ComObject WScript.Shell
@@ -299,6 +308,6 @@ if ($Present.Count -eq 0) {
 Write-Host ''
 Write-Host 'Restore complete.'
 Write-Host 'Modes: oc-vanilla (upstream Superpowers), oc-stable (cost-control lead), oc-core (autonomous Hackathon).'
-Write-Host 'Canary: oc-core-codegraph (Core plus pinned CodeGraph core-profile MCP; install binary separately).'
+Write-Host 'CodeGraph canary retired after the paired benchmark; no treatment launcher is installed.'
 Write-Host 'Desktop: stock OpenCode = Stable, plus OpenCode Vanilla and OpenCode Core shortcuts.'
 Write-Host 'Next: authenticate providers, then run one of the oc-* commands or open a shortcut.'

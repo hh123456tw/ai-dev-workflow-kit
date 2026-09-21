@@ -97,13 +97,12 @@ oc-core       # 自主 Core，--pure，隔離 config
 
 ## Windows 安裝
 
-### CodeGraph-only Core canary
+### CodeGraph-only Core canary（已退役）
 
-正常 `oc-core` 保持無 MCP，作為 A/B control。選配 treatment 先執行
-`scripts/install-codegraph-windows.ps1` 安裝並驗證固定的 CodeGraph `0.20.1`
-Windows binary 與 `onnxruntime.dll`，再執行 setup，使用
-`oc-core-codegraph` 啟動。Treatment 只開官方 `--profile=core`；完整配對量測規則
-見 `docs/research/2026-09-20-codegraph-core-canary.md`。
+配對 benchmark 未達 promotion rule，且正式證據不足，因此 CodeGraph 沒有
+升級進正常 `oc-core`。Treatment config、launcher 與 CLI shim 已移除；
+`scripts/install-codegraph-windows.ps1` 僅保留作研究／重跑工具。完整結果與
+限制見 `docs/research/2026-09-20-codegraph-core-canary.md`。
 
 前置需求：Git、Node.js/npm、OpenCode、PowerShell，以及安裝 gstack 所需的 Git Bash 或 WSL。
 
@@ -116,12 +115,12 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 setup 會依序：
 
-1. 備份全域 config、agents、commands、modes（保留最新 3 份備份）。
+1. 備份全域 config、agents、commands、modes（保留最新 3 份備份），隨即清理已退役的 CodeGraph canary 部署物。
 2. 安裝／更新 gstack。
 3. 部署共用全域 agents 與 commands。
-4. 部署三個 mode 目錄、正常 launchers，以及選配的 Core CodeGraph treatment config／launcher。
+4. 部署三個 mode 目錄與正常 launcher scripts。
 5. 從已安裝的 Superpowers 套件複製 6 個 Core skills（**要求 6.3.0**，版本不符會明確失敗，不靜默降級）。
-6. 安裝 `oc-vanilla`／`oc-stable`／`oc-core`／`oc-core-codegraph`，建立兩個 Desktop 捷徑，並列出待清理的舊產物。
+6. 安裝 `oc-vanilla`／`oc-stable`／`oc-core`，建立兩個 Desktop 捷徑，並列出待清理的舊產物。
 
 步驟 5 需要本機已快取 Superpowers 套件。全新機器第一次執行 setup 時它還不存在，setup 會明確失敗並提示：先在 Stable 啟動一次 OpenCode 讓 plugin 安裝，再重跑 setup。這是預期行為，不會靜默降級成完整 plugin。
 

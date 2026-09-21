@@ -79,8 +79,8 @@ Core must not expose `brainstorming`, `writing-plans`,
 
 Core sets its own `OPENCODE_CONFIG_DIR`, its own `XDG_CONFIG_HOME`, and
 `OPENCODE_DISABLE_EXTERNAL_SKILLS=1`. The normal CLI Core launchers
-(`oc-core.ps1`, `oc-core.sh`) and the optional Windows CodeGraph treatment launcher
-(`oc-core-codegraph.ps1`) additionally run with `--pure`. The Desktop Core wrapper does not,
+(`oc-core.ps1`, `oc-core.sh`) additionally run with `--pure`. The retired Windows
+CodeGraph treatment launcher is no longer shipped. The Desktop Core wrapper does not,
 because OpenCode Desktop is Electron and does not forward `--pure` to its OpenCode
 sidecar, so Desktop isolation rests on the same config dir, `XDG_CONFIG_HOME`, and
 external-skills switch. Core deliberately does not set

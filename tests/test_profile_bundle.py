@@ -149,20 +149,11 @@ class ThreeModeBundleTest(unittest.TestCase):
 
         self.assertIn("modes/core/skills/", self.read_text(".gitignore"))
 
-    def test_codegraph_canary_is_pinned_core_only_and_keeps_control_clean(self) -> None:
+    def test_codegraph_canary_is_retired_and_keeps_control_clean(self) -> None:
         control = self.read_json("modes/core/opencode.jsonc")
-        treatment = self.read_json("modes/core/opencode-codegraph.jsonc")
         self.assertNotIn("mcp", control)
-        self.assertEqual(treatment["default_agent"], "core-lead")
-        self.assertEqual(treatment["model"], control["model"])
-        self.assertEqual(treatment["small_model"], control["small_model"])
-        self.assertNotIn("plugin", treatment)
-        self.assertEqual(set(treatment["mcp"]), {"codegraph"})
-        server = treatment["mcp"]["codegraph"]
-        self.assertEqual(server["type"], "local")
-        self.assertTrue(server["enabled"])
-        self.assertIn("v0.20.1", server["command"][0])
-        self.assertEqual(server["command"][1:], ["--mcp", "--profile=core"])
+        self.assertFalse((ROOT / "modes/core/opencode-codegraph.jsonc").exists())
+        self.assertFalse((ROOT / "scripts/oc-core-codegraph.ps1").exists())
 
         installer = self.read_text("scripts/install-codegraph-windows.ps1")
         for phrase in (
@@ -176,29 +167,48 @@ class ThreeModeBundleTest(unittest.TestCase):
         ):
             self.assertIn(phrase, installer, phrase)
 
-        launcher = self.read_text("scripts/oc-core-codegraph.ps1")
-        for phrase in (
-            "opencode-codegraph.jsonc",
-            "v0.20.1",
-            "--pure",
-            "OPENCODE_CONFIG_DIR",
-            "CODEGRAPH_HOME",
-            "OPENCODE_DISABLE_EXTERNAL_SKILLS",
-            "Get-FileHash",
-        ):
-            self.assertIn(phrase, launcher, phrase)
         for pinned_hash in (
             "aa1b6108217c119af6ac444b8652a0eadcfe2c343bff78ead2edd15b6b7b15b1",
             "52f8ebe8f08f369a44fed6d1cb680c7c89169795e1c2949ee25b88b538ef0948",
         ):
-            self.assertIn(pinned_hash, launcher)
             self.assertIn(pinned_hash, installer)
-        self.assert_core_clears_default_plugins("scripts/oc-core-codegraph.ps1")
 
         setup = self.read_text("scripts/setup-windows.ps1")
-        self.assertIn("opencode-codegraph.jsonc", setup)
-        self.assertIn("oc-core-codegraph.ps1", setup)
-        self.assertIn("oc-core-codegraph.cmd", setup)
+        self.assertNotRegex(
+            setup,
+            re.compile(r"Copy-Item[^\n]*(?:opencode-codegraph|oc-core-codegraph)"),
+        )
+        self.assertNotRegex(
+            setup,
+            re.compile(r"Set-Content[^\n]*oc-core-codegraph"),
+        )
+        launcher_deploy = re.search(
+            r"foreach \(\$script in @\((.*?)\)\) \{\s*Copy-Item .*?\$script",
+            setup,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(launcher_deploy)
+        assert launcher_deploy is not None
+        self.assertNotIn("oc-core-codegraph.ps1", launcher_deploy.group(1))
+        shim_deploy = re.search(
+            r"foreach \(\$mode in @\(([^)]*)\)\) \{\s*\$content =",
+            setup,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(shim_deploy)
+        assert shim_deploy is not None
+        self.assertNotIn("core-codegraph", shim_deploy.group(1))
+        for cleanup_target in (
+            "Join-Path $CoreDir 'opencode-codegraph.jsonc'",
+            "Join-Path $ModesDir 'oc-core-codegraph.ps1'",
+            "Join-Path $Bin 'oc-core-codegraph.cmd'",
+        ):
+            self.assertIn(cleanup_target, setup)
+        self.assertIn("Remove-Item -LiteralPath $artifact -Force", setup)
+        self.assertLess(
+            setup.index("$RetiredCodeGraphArtifacts"),
+            setup.index("[1/6] Installing/updating gstack"),
+        )
 
         manifest = self.read_text(
             "docs/research/2026-09-20-codegraph-core-canary.md"
@@ -206,7 +216,6 @@ class ThreeModeBundleTest(unittest.TestCase):
         for phrase in (
             "CodeGraph-only",
             "oc-core",
-            "oc-core-codegraph",
             "paired",
             "strict success",
             "input tokens",
@@ -216,6 +225,12 @@ class ThreeModeBundleTest(unittest.TestCase):
             "symbol_search",
             "persistent memory",
             "Jev",
+            "inconclusive/underpowered",
+            "not promoted",
+            "removed",
+            "C02 and C08",
+            "C01 exhausted the outer",
+            "Three treatment arms were",
         ):
             self.assertIn(phrase, manifest, phrase)
 
