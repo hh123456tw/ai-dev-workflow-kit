@@ -1,0 +1,6 @@
+{
+  "name": "kit-core",
+  "version": "0.1.0",
+  "description": "Claude lane of the Core mode: six curated Superpowers skills, read-only reviewer and explorer, and a deterministic completion gate.",
+  "author": {"name": "opencode-dual-workflow-kit"}
+}

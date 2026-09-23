@@ -1,0 +1,48 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {"type": "command", "command": "python", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/kit_gate.py", "session-start"], "timeout": 60}
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {"type": "command", "command": "python", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/kit_gate.py", "prompt"], "timeout": 30}
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|PowerShell|Agent|Task",
+        "hooks": [
+          {"type": "command", "command": "python", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/kit_gate.py", "record"], "timeout": 60}
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash|PowerShell|Agent|Task",
+        "hooks": [
+          {"type": "command", "command": "python", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/kit_gate.py", "record"], "timeout": 60}
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {"type": "command", "command": "python", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/kit_gate.py", "record"], "timeout": 60}
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {"type": "command", "command": "python", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/kit_gate.py", "stop"], "timeout": 120}
+        ]
+      }
+    ]
+  }
+}

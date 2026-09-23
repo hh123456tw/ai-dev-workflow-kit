@@ -103,11 +103,30 @@ and fails setup on a mismatch instead of silently falling back to the full plugi
 - Escalate architecture, auth/payment/security, migration, and test-vs-spec
   conflicts instead of guessing.
 
+## Claude lane
+
+`modes/claude/` ports the Core rules to Claude Code: `claude-core` (Max through the
+official CLI) and `claude-ds` (DeepSeek's Anthropic-compatible endpoint), deployed
+by `scripts/setup-claude-lane.ps1` to `~/.config/claude-kit`. Both load the
+`kit-core` plugin (six curated skills, read-only reviewer/explorer, completion
+gate) with `--setting-sources project,local` and hide personal skills. The
+launcher removes every `ANTHROPIC_*` override and Claude Desktop host-session
+variable for the child and restores the caller's environment afterwards.
+`claude-ds` uses its own `CLAUDE_CONFIG_DIR`, so it cannot spend the Max
+subscription.
+
+The completion gate (`modes/claude/core/plugin/hooks/kit_gate.py`) blocks Stop
+while files changed in the session and `.claude-kit/receipt.json` is missing,
+stale, or contradicted by recorded evidence: real exit codes from
+PostToolUse/PostToolUseFailure, reviewer dispatches, and a review trigger it
+recomputes itself. `CORE.md` must stay in step with `core-lead.md`; tests enforce
+the shared skill list, pin, and denials.
+
 ## Verification
 
 ```powershell
 pwsh -NoProfile -File tests/profile-bundle.acceptance.ps1
-python -m pytest tests/test_profile_bundle.py -q
+python -m pytest tests -q
 ```
 
 ## Next stage (research only)

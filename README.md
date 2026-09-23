@@ -141,11 +141,39 @@ Unix 只提供三個 CLI launcher，不建立 Desktop 捷徑（Desktop 捷徑是
 
 與 Windows 相同，步驟 5 需要本機已快取 Superpowers 套件。全新機器的第一次 setup 會明確失敗；先在 Stable 啟動一次 OpenCode 讓 plugin 安裝，再重跑 `./scripts/setup-unix.sh`。
 
+## Claude lane（claude-core / claude-ds，Windows）
+
+Core 規則的 Claude Code 版本。兩條 lane 載入同一套規則（[`modes/claude/core/CORE.md`](modes/claude/core/CORE.md)）、同樣 6 個精選 skills、唯讀的 `kit-core:reviewer` / `kit-core:explorer`，以及決定性的 **completion gate**。
+
+| Lane | 後端 | 認證 |
+| --- | --- | --- |
+| `claude-core` | Claude Max（官方 `claude` CLI） | CLI 自己的 `/login`；清掉所有 `ANTHROPIC_*` 覆寫與 Claude Desktop 宿主變數 |
+| `claude-ds` | DeepSeek Anthropic 相容端點 | `DEEPSEEK_API_KEY`；獨立 `CLAUDE_CONFIG_DIR`，碰不到 Max；所有模型別名釘在 `deepseek-flash`（避免 opus 被映射到 v4-pro） |
+
+安裝（不會寫入 `~/.claude`）：
+
+```powershell
+pwsh -NoProfile -File scripts/setup-claude-lane.ps1
+```
+
+**Completion gate** 是 plugin 內的 hook（[`kit_gate.py`](modes/claude/core/plugin/hooks/kit_gate.py)）：SessionStart 記錄基準，PostToolUse / PostToolUseFailure 記錄實際執行的指令與真實 exit code、reviewer 派遣；Stop 時只要本 session 有檔案變更，就要求 `.claude-kit/receipt.json`，並自行重算 review 門檻、比對證據。`incomplete` / `verification_blocked` 只要說明原因就放行；連續擋 3 次後放行但顯示 `COMPLETION GATE FAILED`。
+
+每次啟動 launcher 都會建立專屬的 verdict 檔（`CLAUDE_KIT_VERDICT_FILE`），gate 每次 Stop 都寫入。Session 結束後，只有 `pass`、`no_changes`、`no_repository` 維持 exit 0；`blocked`、`gate_failed`、`gate_crashed` 或完全沒有 verdict（gate 崩潰、逾時、未啟動、session 被中斷）都會在 stderr 說明並以 **exit 3** 結束，無人值守的 `-p` 執行也看得到。歷史紀錄另存於 `<git-dir>/claude-kit/`。
+
+驗證指令只接受單一指令或 `&&` 串接；含 `;`、`|`、`||`、單獨的 `&` 或換行的指令不能證明通過（引號內的文字不算）。
+
+已知限制：
+- `deadline_mode`、risk flags 與 "generated" 降級理由仍由 agent 自行申報，gate 只能檢查一致性，無法驗證真偽。
+- Gate 只檢查 session 開始時所在的 repo；session 中途 `cd` 到另一個 repo 所做的變更不會被檢查。
+- 出錯結束的 reviewer 也會被 SubagentStop 記為完成；gate 只確認 `kit-core:reviewer` 跑完，不解讀它的結論。
+- `git -C . reset --hard`、`git.exe clean` 這類變形可以繞過 deny 規則（OpenCode 版本也有同樣的限制）。
+- 「可證明的指令」判斷是啟發式的：引號解析沒有完整模擬 Bash / PowerShell 的轉義規則，刻意構造的指令（例如 `bash -c "pytest; true"`）仍可能過關。它擋的是無心的 `| tail`、`; echo`，不是蓄意造假。`claude-ds` 開啟 `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` 保護 token，Claude Code 會因此強制 default 權限模式，自動化執行請明確給 `--allowedTools`。Unix launcher 尚未提供。
+
 ## 驗證
 
 ```powershell
 pwsh -NoProfile -File tests/profile-bundle.acceptance.ps1
-python -m pytest tests/test_profile_bundle.py -q
+python -m pytest tests -q
 ```
 
 ## 後續研究

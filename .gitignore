@@ -15,6 +15,7 @@ credentials/
 
 # Core mode skills are deployed from the installed Superpowers package, never vendored
 modes/core/skills/
+modes/claude/core/plugin/skills/
 
 # Runtime / caches
 node_modules/
