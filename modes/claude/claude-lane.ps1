@@ -111,12 +111,11 @@ try {
   foreach ($name in $managed) { Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue }
   $env:CLAUDE_KIT_VERDICT_FILE = $verdictFile
   if ($lane -eq 'ds') {
-    # The DeepSeek key stays with the claude process; its shell tool and hooks get
-    # none. Claude Code then forces the default permission mode, so pass
-    # --allowedTools explicitly for unattended runs. Core is not scrubbed, to keep
-    # the chosen permission mode; its only possible credential is a Max
-    # CLAUDE_CODE_OAUTH_TOKEN, which its shell tool can then see.
-    $env:CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = '1'
+    # Scrubbing hides the DeepSeek key from the shell tool and hooks, but Claude
+    # Code then forces the default permission mode and ignores a requested
+    # bypassPermissions/acceptEdits. The chosen permission mode wins by default;
+    # set CLAUDE_DS_SCRUB=1 to trade it for the key protection.
+    if ($env:CLAUDE_DS_SCRUB -eq '1') { $env:CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = '1' }
     $model = if ($env:CLAUDE_DS_MODEL) { $env:CLAUDE_DS_MODEL } else { 'deepseek-flash[1m]' }
     $small = if ($env:CLAUDE_DS_SMALL_MODEL) { $env:CLAUDE_DS_SMALL_MODEL } else { 'deepseek-flash' }
     # Separate config dir: no Max credentials exist there, so this lane cannot

@@ -417,7 +417,19 @@ class DeepSeekLaunchTest(DeployedLaneTestCase):
         self.assertEqual(child["ANTHROPIC_DEFAULT_HAIKU_MODEL"], "deepseek-flash")
         self.assertEqual(child["CLAUDE_CODE_SUBAGENT_MODEL"], "deepseek-flash")
         self.assertEqual(child["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"], "1")
-        self.assertEqual(child["CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"], "1")
+
+    def test_permission_mode_is_honoured_by_default(self) -> None:
+        """Scrubbing makes Claude Code force the default permission mode, which
+        overrides a requested bypass/acceptEdits; it is therefore opt-in."""
+        run = self.launch("ds", "--permission-mode", "bypassPermissions",
+                          env={"DEEPSEEK_API_KEY": "k", "CLAUDE_DS_SCRUB": None,
+                               "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1"})
+        self.assertIsNone(run["seen"]["env"]["CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"])
+        self.assertIn("bypassPermissions", run["seen"]["args"])
+
+    def test_key_scrubbing_is_opt_in(self) -> None:
+        run = self.launch("ds", env={"DEEPSEEK_API_KEY": "k", "CLAUDE_DS_SCRUB": "1"})
+        self.assertEqual(run["seen"]["env"]["CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"], "1")
 
     def test_cannot_reach_the_max_subscription(self) -> None:
         run = self.launch("ds", env={"DEEPSEEK_API_KEY": "ds-key", "CLAUDE_CODE_OAUTH_TOKEN": "max-token",

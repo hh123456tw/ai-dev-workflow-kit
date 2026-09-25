@@ -176,7 +176,7 @@ pwsh -NoProfile -File scripts/setup-claude-lane.ps1
 - Gate 只檢查 session 開始時所在的 repo；session 中途 `cd` 到另一個 repo 所做的變更不會被檢查。
 - 出錯結束的 reviewer 也會被 SubagentStop 記為完成；gate 只確認 `kit-core:reviewer` 跑完，不解讀它的結論。
 - `git -C . reset --hard`、`git.exe clean` 這類變形可以繞過 deny 規則（OpenCode 版本也有同樣的限制）。
-- 「可證明的指令」判斷是啟發式的：引號解析沒有完整模擬 Bash / PowerShell 的轉義規則，刻意構造的指令（例如 `bash -c "pytest; true"`）仍可能過關。它擋的是無心的 `| tail`、`; echo`，不是蓄意造假。`claude-ds` 開啟 `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` 保護 token，Claude Code 會因此強制 default 權限模式，自動化執行請明確給 `--allowedTools`。Unix launcher 尚未提供。
+- 「可證明的指令」判斷是啟發式的：引號解析沒有完整模擬 Bash / PowerShell 的轉義規則，刻意構造的指令（例如 `bash -c "pytest; true"`）仍可能過關。它擋的是無心的 `| tail`、`; echo`，不是蓄意造假。`claude-ds` 預設遵守你指定的權限模式（包括 `bypassPermissions`），代價是 agent 執行的指令看得到 DeepSeek key；設 `CLAUDE_DS_SCRUB=1` 可隱藏 key，但 Claude Code 會因此強制 default 權限模式。Unix launcher 尚未提供。
 
 ## 驗證
 
