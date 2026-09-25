@@ -1,5 +1,5 @@
 param(
-  [string]$RepoName = 'opencode-dual-workflow-kit',
+  [string]$RepoName = 'ai-dev-workflow-kit',
   [ValidateSet('private','public')][string]$Visibility = 'private'
 )
 $ErrorActionPreference='Stop'

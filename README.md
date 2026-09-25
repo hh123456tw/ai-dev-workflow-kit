@@ -1,6 +1,15 @@
-# OpenCode 三模式工作流工具組
+# ai-dev-workflow-kit
 
-可攜的 OpenCode 設定，提供**三套互相隔離**的開發模式。本 repository 只保存設定與還原腳本；憑證、OAuth 狀態、快取及第三方框架原始碼都留在本機。新電腦 clone 之後是**三步**：先跑一次 setup 讓 plugin 被宣告，在 Stable 啟動一次 OpenCode 讓 Superpowers plugin 安裝，再跑一次 setup 部署 Core skills（剩下只需 `opencode auth login`）。
+可攜的 AI 開發工作流設定，涵蓋兩個 harness：
+
+- **OpenCode**：Vanilla、Stable、Core 三套互相隔離的模式（`oc-vanilla`、`oc-stable`、`oc-core`）。
+- **Claude Code**：Core 規則的 Claude 版本（`claude-core` 用 Max、`claude-ds` 用 DeepSeek），附決定性的 completion gate，見下方〈Claude lane〉。
+
+另外備份 Claude Code 個人 skills 的清單與來源（gstack、Matt Pocock skills 等），見 [`claude-skills/`](claude-skills/README.md)。實測結果見 [`docs/research/2026-09-23-claude-lane-benchmark.md`](docs/research/2026-09-23-claude-lane-benchmark.md)。
+
+本 repository 只保存設定與還原腳本；憑證、OAuth 狀態、快取及第三方框架原始碼都留在本機。
+
+OpenCode 在新電腦 clone 之後是**三步**：先跑一次 setup 讓 plugin 被宣告，在 Stable 啟動一次 OpenCode 讓 Superpowers plugin 安裝，再跑一次 setup 部署 Core skills（剩下只需 `opencode auth login`）。
 
 ## 三種模式
 
@@ -107,8 +116,8 @@ oc-core       # 自主 Core，--pure，隔離 config
 前置需求：Git、Node.js/npm、OpenCode、PowerShell，以及安裝 gstack 所需的 Git Bash 或 WSL。
 
 ```powershell
-git clone https://github.com/hh123456tw/opencode-dual-workflow-kit.git
-Set-Location opencode-dual-workflow-kit
+git clone https://github.com/hh123456tw/ai-dev-workflow-kit.git
+Set-Location ai-dev-workflow-kit
 Set-ExecutionPolicy -Scope Process Bypass
 ./scripts/setup-windows.ps1
 ```
@@ -131,8 +140,8 @@ setup 會依序：
 ## macOS/Linux 安裝
 
 ```bash
-git clone https://github.com/hh123456tw/opencode-dual-workflow-kit.git
-cd opencode-dual-workflow-kit
+git clone https://github.com/hh123456tw/ai-dev-workflow-kit.git
+cd ai-dev-workflow-kit
 chmod +x scripts/*.sh
 ./scripts/setup-unix.sh
 ```
