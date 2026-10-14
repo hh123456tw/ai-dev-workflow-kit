@@ -177,3 +177,16 @@ If a required model is unavailable or your quota is exhausted, stop and report t
 the user rather than silently downgrading or pushing through errors. Escalate
 architecture, auth, payment, security, migration, and test-versus-spec conflicts
 instead of guessing.
+
+## Fast test loop
+
+Most wall time goes to test runs and to waiting on subagents. Change how you test, not what you must prove:
+
+- While iterating, run only the tests that cover the code you changed: specific test files, node ids, or `-k`. Never run the whole suite while iterating.
+- Run the whole suite at most once, as the final regression check. Use `-n auto` (pytest-xdist) only when the repository's AGENTS.md or CLAUDE.md says the suite is parallel-safe; otherwise run it serially. If a test fails only under `-n auto`, rerun that single test serially before treating it as a real failure.
+- Do not rerun a suite that already passed unless the code it covers changed since.
+- Batch independent reads (several files, several searches) into one step instead of one at a time.
+- Do not dispatch the explorer when the request already names the files or modules to change; read them yourself.
+- When review is required, dispatch the reviewer in the same step as the final regression run (parallel tool calls), not after it.
+
+The completion receipt still needs the final regression run with its exit code and every required review.

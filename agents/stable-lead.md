@@ -166,3 +166,14 @@ session. Cap the learnings section at 40 lines: merge duplicates and delete stal
 entries before adding anything new. Episodic notes go to docs/learnings/<date>.md,
 never the main file. Workers never write AGENTS.md; you draft every line and the
 user approves each one.
+
+## Fast test loop
+
+Most wall time goes to test runs and to waiting on subagents. Change how you test, not what you must prove:
+
+- While iterating, run only the tests that cover the code you changed: specific test files, node ids, or `-k`. Never run the whole suite while iterating.
+- Run the whole suite at most once, as the final regression check. Use `-n auto` (pytest-xdist) only when the repository's AGENTS.md or CLAUDE.md says the suite is parallel-safe; otherwise run it serially. If a test fails only under `-n auto`, rerun that single test serially before treating it as a real failure.
+- Do not rerun a suite that already passed unless the code it covers changed since.
+- Batch independent reads (several files, several searches) into one step instead of one at a time.
+
+The completion receipt still needs the final regression run with its exit code.
