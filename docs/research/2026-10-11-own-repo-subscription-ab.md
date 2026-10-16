@@ -91,3 +91,44 @@
 - 有幾題反而變慢：af-2ee1366 / af-7b2ec5a 的 cc-fast、af-4a22606 / qp-f72a686 的 oc-fast。單題的時間變異很大。
 
 **下一個槓桿：** subagent 等待時間（56 分，約佔 28%）完全沒有減少，需要改 Core 的 review 觸發機制或 dispatch 方式，光靠 prompt 提示不夠。
+
+## 加測：現行 Claude Code、Ponytail、milktea（2026-10-16，`own-repo-plugins-g2`）
+
+**這輪要回答的問題：** 在使用者實際的 Claude Code 上，加裝熱門的 skill 和 plugin，能不能讓結果更好或更快？
+
+**四個 arm：**
+
+- `cc-current`：使用者實際的 `~/.claude` 設定，包含 hooks、plugins、MCP，以及含快速測試規則的全域 `CLAUDE.md`，完全不做隔離。
+- `cc-ponytail`：`cc-fast` 加上 Ponytail 5.2.0（full mode）。
+- `cc-milktea`：milktea `implement` 強制跑完整流程，Claude 當 Developer，Codex 當 Reviewer A 和 B，再加上 Ponytail 與 i-have-adhd。
+- `cc-milktea-auto`：與 `cc-milktea` 相同，但讓 lead 自己決定要不要跑完整流程。
+
+兩個 milktea arm 都跳過 grill-me，直接把 request 當成已核准的 spec，並拆成一張 ticket。
+
+| arm | strict | 假完成 | 10 題總 wall | 相對 cc-fast |
+| --- | ---: | ---: | ---: | ---: |
+| cc-fast（2026-10-12 基準） | 8/10 | 1 | 47 分 | — |
+| cc-current | 7/10 | 3 | 42 分 | 0.90 |
+| **cc-ponytail** | 7/10 | 3 | **33 分** | **0.70** |
+| cc-milktea-auto | 8/10 | 2 | 48 分 | 1.01 |
+| cc-milktea | 8/10 | 1 | 231 分 | **4.92** |
+
+**af-4a22606 重跑（每個 arm 4 次）：**
+
+- cc-ponytail 過 1/4，cc-current 也過 1/4，失敗原因相同：都把 `:(exclude,literal)` 的 pathspec 傳給 `git add`。
+- 單次跑時兩組少過的這一題，是題目本身容易隨機失敗，不是 Ponytail 造成的。cc-fast、cc-default、milktea 在這題上都只跑過 1 次，而且都通過。
+
+**結論：**
+
+- **Ponytail：** 品質和 cc-current 一樣，10 題總時間少 23%（相對 cc-fast 少 31%），lead 的 output token 少 17%。方向和 JetBrains 的獨立實測一致（−11% 時間）。**已採用**，裝進日常 Claude Code。
+- **milktea 強制完整流程：** 通過與失敗的題目和其他 arm 完全一樣，兩個 Codex Reviewer 沒有救回任何一題，時間卻是 4.9 倍。另外，Codex 的 sandbox 在這台 Windows 上起不來（`setup refresh had errors`），Reviewer 只能做靜態審查。
+- **milktea-auto：** 在小任務上，lead 會略過 Developer 和 Reviewer 的流程（「改動只有一行」），結果等於 cc-fast，沒有額外好處。
+- **cc-current：** 使用者另外裝的 plugin，在這類任務上沒有明顯加分。
+- **i-have-adhd：** 只改輸出格式，沒有獨立量測，依使用者偏好安裝。
+
+**過程紀錄：**
+
+- **OOM：** 使用者的本機 LLM `strata` 佔用約 32 GB commit，加上 milktea 巢狀的 CLI，耗盡了 64 GB commit。11 格封存到 `aborted/oom-20261016/`。之後加上記憶體門檻（每格前要有 ≥8 GB free commit，milktea 要 12 GB），每格結束後也會清除殘留的子程序。
+- **重開機後 BIOS 虛擬化被關閉**（`HCS_E_HYPERV_NOT_INSTALLED`）：Docker 和 WSL2 無法啟動，agentforge 的 Postgres 不可用。受影響的 2 格封存到 `aborted/no-docker-20261016/`，修好後重跑。
+- **排序：** 為了讓 smoke 那格排第一，排序時把所有 `cc-milktea` 排到最前，結果這組集中在同一段時間跑完，沒有和其他 arm 交錯。
+- **限制：** 每題 1 次，只有 af-4a22606 跑了 4 次；cc-fast 是前幾天的基準；cc-current 會隨使用者設定的變動而改變。
