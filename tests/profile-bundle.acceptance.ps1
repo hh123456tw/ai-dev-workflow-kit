@@ -138,7 +138,7 @@ Assert-True ($completionGate -match [regex]::Escape('never record a required rev
 
 $reviewSection = Get-Flat (Get-Section $coreLead 'Review')
 Assert-True ($reviewSection.Length -gt 0) 'core-lead must define a Review section'
-Assert-True ($coreLead -match '(?m)^    reviewer: allow$') 'core-lead must keep reviewer task permission available'
+Assert-True ($coreLead -match '(?m)^    reviewer: allow\s*$') 'core-lead must keep reviewer task permission available'
 foreach ($phrase in @('Build: review is required when a change touches two or more production files', 'Feature Freeze: review is required only when a change touches two or more production files and at least one', 'Demo Survival: review is required only when a change touches two or more production files and at least one', 'Production files are tracked files outside tests, documentation, fixtures, examples, and generated output', 'Runtime configuration and package manifests count as production', 'classify every changed file', 'record every risk flag as true or false with affected paths', 'demo_path', 'cross_module', 'concurrency', 'shared_state', 'external_api', 'external_integration', 'demo_blocking_cross_module_crash', 'review_not_required', '`reviewer` subagent', '`explorer` is not a substitute', 'not your judgment', 'authoritative for what they cover', 'not sufficient for completion', 'gets a regression test when the correction changes behavior')) {
   Assert-True ($reviewSection -match [regex]::Escape($phrase)) "core-lead Review must state '$phrase'"
 }
